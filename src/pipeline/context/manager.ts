@@ -5,6 +5,7 @@
 import type { FormattedMessage } from '../../shared/types.js';
 import { getRedis } from '../../db/redis.js';
 import { env } from '../../env.js';
+import { logger } from '../../shared/logger.js';
 
 const CTX_PREFIX = 'xxb:ctx:';
 const MEMBERS_PREFIX = 'xxb:members:';
@@ -45,15 +46,19 @@ export async function addMessage(chatId: number, message: FormattedMessage): Pro
 
   // Track group member (skip bots and assistant messages)
   if (message.uid && message.role === 'user' && !message.isBot) {
-    const memberKey = MEMBERS_PREFIX + chatId;
-    const memberData = JSON.stringify({
-      uid: message.uid,
-      username: message.username,
-      fullName: message.fullName,
-      lastSeen: message.timestamp,
-    });
-    await redis.hset(memberKey, String(message.uid), memberData);
-    await redis.expire(memberKey, MEMBERS_TTL);
+    try {
+      const memberKey = MEMBERS_PREFIX + chatId;
+      const memberData = JSON.stringify({
+        uid: message.uid,
+        username: message.username,
+        fullName: message.fullName,
+        lastSeen: message.timestamp,
+      });
+      await redis.hset(memberKey, String(message.uid), memberData);
+      await redis.expire(memberKey, MEMBERS_TTL);
+    } catch (err) {
+      logger.debug({ err, chatId }, 'Member tracking failed (non-critical)');
+    }
   }
 }
 

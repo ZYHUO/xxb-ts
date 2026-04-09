@@ -108,8 +108,13 @@ export class BotInteractionTracker {
   }
 
   needsDigest(chatId: number, botUsername: string): boolean {
-    const meta = this.loadMeta(chatId, botUsername);
-    const undigested = meta.rawCount - meta.digestedCount;
+    const bot = botUsername.replace(/^@/, '');
+    const meta = this.loadMeta(chatId, bot);
+    // Query actual count from bot_interactions (raw_count in meta is only updated after digest)
+    const actual = getDb()
+      .prepare('SELECT COUNT(*) as cnt FROM bot_interactions WHERE chat_id = ? AND bot_username = ?')
+      .get(chatId, bot) as { cnt: number };
+    const undigested = actual.cnt - meta.digestedCount;
     if (undigested >= DIGEST_THRESHOLD) return true;
     if (undigested > 0 && now() - meta.lastDigestTs >= DIGEST_INTERVAL) return true;
     return false;
