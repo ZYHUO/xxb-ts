@@ -12,6 +12,7 @@ import { freeEncoder } from './ai/token-counter.js';
 import { createAllowlistMiddleware } from './bot/middleware/allowlist.js';
 import { registerMemberHandler } from './bot/handlers/member.js';import { createAdminApi } from './admin/api.js';
 import { startCronJobs, stopCronJobs } from './cron/scheduler.js';
+import { initBotTracker } from './tracking/interaction.js';
 import type { AllowlistConfig } from './allowlist/types.js';
 
 async function main(): Promise<void> {
@@ -28,6 +29,9 @@ async function main(): Promise<void> {
   // 3. Run SQLite migrations
   const appConfig = getConfig();
   runMigrations(appConfig.migrationsDir);
+
+  // 3.5 Initialize bot interaction tracker
+  initBotTracker();
 
   // 4. Create bot (fetches bot identity via getMe)
   const bot = await createBot();

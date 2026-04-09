@@ -75,6 +75,7 @@ export function buildMessages(
   knowledge?: string,
   checkinData?: string,
   memberRoster?: string,
+  botKnowledge?: string,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const userParts: string[] = [];
 
@@ -88,6 +89,10 @@ export function buildMessages(
 
   if (memberRoster) {
     userParts.push(`[群成员]\n${memberRoster}`);
+  }
+
+  if (botKnowledge) {
+    userParts.push(`[群组Bot知识]\n${botKnowledge}`);
   }
 
   userParts.push(`[群聊上下文]\n${context}`);

@@ -12,6 +12,7 @@ import { generateWithTools } from '../tools/executor.js';
 import { parseReplyResponse } from './parser.js';
 import { getRecent, getGroupMembers } from '../context/manager.js';
 import { doCheckin } from '../checkin.js';
+import { getBotTracker } from '../../tracking/interaction.js';
 import { logger } from '../../shared/logger.js';
 
 const MAX_DUPLICATE_RETRIES = 1;
@@ -95,8 +96,26 @@ export async function generateReply(
     }
   }
 
+  // 3.7 Inject bot knowledge (digests about other bots in the group)
+  let botKnowledge: string | undefined;
+  if (chatId < 0) {
+    try {
+      const tracker = getBotTracker();
+      if (tracker) {
+        const contextForBotScan = compressed.map(m => ({
+          isBot: m.isBot,
+          botUsername: m.isBot ? m.username : undefined,
+        }));
+        const knowledge_str = tracker.getKnowledgeForReply(chatId, contextForBotScan);
+        if (knowledge_str) botKnowledge = knowledge_str;
+      }
+    } catch (err) {
+      logger.debug({ err, chatId }, 'Failed to fetch bot knowledge (non-critical)');
+    }
+  }
+
   // 4. Build messages array
-  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData, memberRoster);
+  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData, memberRoster, botKnowledge);
 
   // 5. Call AI (with tool support via Vercel AI SDK)
   const usage = replyAction === 'REPLY_PRO' ? 'reply_pro' : 'reply';
