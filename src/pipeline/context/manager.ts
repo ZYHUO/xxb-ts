@@ -7,7 +7,9 @@ import { getRedis } from '../../db/redis.js';
 import { env } from '../../env.js';
 
 const CTX_PREFIX = 'xxb:ctx:';
+const MEMBERS_PREFIX = 'xxb:members:';
 const TRUNCATE_SIZE = 50;
+const MEMBERS_TTL = 30 * 86400; // 30 days
 const CTX_TTL = 7 * 86400; // 7 days rolling TTL
 
 // Atomic rpush + trim + expire via Lua
@@ -40,6 +42,19 @@ export async function addMessage(chatId: number, message: FormattedMessage): Pro
     String(maxLen - TRUNCATE_SIZE),
     String(CTX_TTL),
   );
+
+  // Track group member (skip bots and assistant messages)
+  if (message.uid && message.role === 'user' && !message.isBot) {
+    const memberKey = MEMBERS_PREFIX + chatId;
+    const memberData = JSON.stringify({
+      uid: message.uid,
+      username: message.username,
+      fullName: message.fullName,
+      lastSeen: message.timestamp,
+    });
+    await redis.hset(memberKey, String(message.uid), memberData);
+    await redis.expire(memberKey, MEMBERS_TTL);
+  }
 }
 
 export async function getRecent(chatId: number, count: number): Promise<FormattedMessage[]> {
@@ -71,4 +86,27 @@ export async function addAssistant(chatId: number, reply: { textContent: string;
     isForwarded: false,
   };
   await addMessage(chatId, assistantMsg);
+}
+
+export interface GroupMember {
+  uid: number;
+  username: string;
+  fullName: string;
+  lastSeen: number;
+}
+
+/** Get all known members of a group (from message history) */
+export async function getGroupMembers(chatId: number): Promise<GroupMember[]> {
+  const redis = getRedis();
+  const memberKey = MEMBERS_PREFIX + chatId;
+  const all = await redis.hgetall(memberKey);
+  const members: GroupMember[] = [];
+  for (const val of Object.values(all)) {
+    try {
+      members.push(JSON.parse(val) as GroupMember);
+    } catch { /* skip corrupted entries */ }
+  }
+  // Sort by last seen (most recent first)
+  members.sort((a, b) => b.lastSeen - a.lastSeen);
+  return members;
 }

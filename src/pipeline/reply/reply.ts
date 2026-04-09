@@ -10,7 +10,7 @@ import { compressContext } from '../context/compressor.js';
 import { getKnowledge } from '../../knowledge/manager.js';
 import { generateWithTools } from '../tools/executor.js';
 import { parseReplyResponse } from './parser.js';
-import { getRecent } from '../context/manager.js';
+import { getRecent, getGroupMembers } from '../context/manager.js';
 import { doCheckin } from '../checkin.js';
 import { logger } from '../../shared/logger.js';
 
@@ -76,8 +76,27 @@ export async function generateReply(
     }
   }
 
+  // 3.6 Build group member roster
+  let memberRoster: string | undefined;
+  if (chatId < 0) { // only for group chats
+    try {
+      const members = await getGroupMembers(chatId);
+      if (members.length > 0) {
+        memberRoster = members
+          .slice(0, 50) // cap at 50 members to save tokens
+          .map(m => {
+            const tag = m.username ? `@${m.username}` : `#${m.uid}`;
+            return `${m.fullName}(${tag})`;
+          })
+          .join('、');
+      }
+    } catch (err) {
+      logger.debug({ err, chatId }, 'Failed to fetch member roster (non-critical)');
+    }
+  }
+
   // 4. Build messages array
-  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData);
+  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData, memberRoster);
 
   // 5. Call AI (with tool support via Vercel AI SDK)
   const usage = replyAction === 'REPLY_PRO' ? 'reply_pro' : 'reply';

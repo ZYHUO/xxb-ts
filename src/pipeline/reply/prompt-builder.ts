@@ -74,6 +74,7 @@ export function buildMessages(
   latestMessage: FormattedMessage,
   knowledge?: string,
   checkinData?: string,
+  memberRoster?: string,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const userParts: string[] = [];
 
@@ -83,6 +84,10 @@ export function buildMessages(
 
   if (checkinData) {
     userParts.push(checkinData);
+  }
+
+  if (memberRoster) {
+    userParts.push(`[群成员]\n${memberRoster}`);
   }
 
   userParts.push(`[群聊上下文]\n${context}`);
