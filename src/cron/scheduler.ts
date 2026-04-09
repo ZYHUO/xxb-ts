@@ -6,15 +6,21 @@
 import cron from 'node-cron';
 import { runDailyReport } from './report.js';
 import { runModelCheck } from './model-check.js';
-import { runCleanup } from './cleanup.js';
+import { runCleanup, type CleanupDeps } from './cleanup.js';
 import { logger } from '../shared/logger.js';
+
+export interface CronDeps {
+  cleanupDeps?: CleanupDeps;
+}
 
 const tasks: cron.ScheduledTask[] = [];
 let _started = false;
+let _deps: CronDeps = {};
 
-export function startCronJobs(): void {
+export function startCronJobs(deps?: CronDeps): void {
   if (_started) return;
   _started = true;
+  if (deps) _deps = deps;
 
   const enabled = process.env['CRON_ENABLED'] !== 'false' && process.env['CRON_ENABLED'] !== '0';
   if (!enabled) {
@@ -34,7 +40,7 @@ export function startCronJobs(): void {
 
   // Cleanup — every 6 hours
   tasks.push(cron.schedule('0 */6 * * *', () => {
-    void safeRun('cleanup', runCleanup);
+    void safeRun('cleanup', () => runCleanup(_deps.cleanupDeps));
   }));
 
   logger.info({ jobCount: tasks.length }, 'Cron jobs started');

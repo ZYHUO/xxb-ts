@@ -31,6 +31,17 @@ async function handleBootstrap(
   user: TelegramUser,
   master: boolean,
 ): Promise<Record<string, unknown>> {
+  // Non-master users only see their own submissions
+  if (!master) {
+    const myData = await allowlist.listByUser(deps.redis, deps.config, user.id);
+    return {
+      ok: true,
+      is_master: false,
+      user: { id: user.id, first_name: user.first_name, username: user.username },
+      ...myData,
+    };
+  }
+
   const pending = await allowlist.listPending(deps.redis, deps.config);
   const groups = await allowlist.listGroups(deps.redis, deps.config);
   const manualQueue = await allowlist.listManualQueue(deps.redis, deps.config);
@@ -45,6 +56,18 @@ async function handleBootstrap(
     },
     override,
   );
+
+  // Strip API keys from providers before sending to client
+  if (modelRouting.providers && typeof modelRouting.providers === 'object') {
+    const sanitized = modelRouting.providers as Record<string, Record<string, unknown>>;
+    for (const label of Object.keys(sanitized)) {
+      const entry = sanitized[label];
+      if (entry) {
+        delete entry.api_key;
+        delete entry.api_keys;
+      }
+    }
+  }
 
   const stickerPolicy = runtimeConfig.buildStickerPolicyAdminView(override);
 
@@ -226,18 +249,29 @@ async function handleRemoveGroup(
 
 async function handleModelRoutingGet(deps: ApiDeps): Promise<Record<string, unknown>> {
   const override = await runtimeConfig.loadOverride(deps.redis);
-  return {
-    ok: true,
-    ...runtimeConfig.buildModelRoutingAdminView(
-      {
-        AI_MODEL_REPLY: deps.env.AI_MODEL_REPLY,
-        AI_MODEL_REPLY_PRO: deps.env.AI_MODEL_REPLY_PRO,
-        AI_MODEL_JUDGE: deps.env.AI_MODEL_JUDGE,
-        AI_MODEL_ALLOWLIST_REVIEW: deps.env.AI_MODEL_ALLOWLIST_REVIEW,
-      },
-      override,
-    ),
-  };
+  const view = runtimeConfig.buildModelRoutingAdminView(
+    {
+      AI_MODEL_REPLY: deps.env.AI_MODEL_REPLY,
+      AI_MODEL_REPLY_PRO: deps.env.AI_MODEL_REPLY_PRO,
+      AI_MODEL_JUDGE: deps.env.AI_MODEL_JUDGE,
+      AI_MODEL_ALLOWLIST_REVIEW: deps.env.AI_MODEL_ALLOWLIST_REVIEW,
+    },
+    override,
+  );
+
+  // Strip API keys from providers before sending to client
+  if (view.providers && typeof view.providers === 'object') {
+    const sanitized = view.providers as Record<string, Record<string, unknown>>;
+    for (const label of Object.keys(sanitized)) {
+      const entry = sanitized[label];
+      if (entry) {
+        delete entry.api_key;
+        delete entry.api_keys;
+      }
+    }
+  }
+
+  return { ok: true, ...view };
 }
 
 async function handleModelRoutingSave(
@@ -321,6 +355,15 @@ export function createAdminApi(deps: ApiDeps): Hono {
   });
 
   api.get('/model_status', async (c) => {
+    // Require master auth via query param
+    const initData = c.req.query('init_data');
+    if (!initData) {
+      return c.json({ ok: false, error: 'forbidden' }, 403);
+    }
+    const user = validateInitData(initData, deps.env.BOT_TOKEN);
+    if (!user || !isMaster(user.id, deps.env.MASTER_UID)) {
+      return c.json({ ok: false, error: 'forbidden' }, 403);
+    }
     const history = await modelStatus.getModelStatusHistory(deps.redis);
     return c.json({ ok: true, history });
   });
@@ -348,11 +391,13 @@ export function createAdminApi(deps: ApiDeps): Hono {
       switch (action) {
         case 'bootstrap':
           return c.json(await handleBootstrap(deps, user, master));
+        // User-accessible actions (any authenticated user):
         case 'submit':
           return c.json(await handleSubmit(deps, user, body));
         case 'my_submissions':
           return c.json(await handleMySubmissions(deps, user));
         case 'check_bot_permissions':
+          if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
           return c.json(await handleCheckBotPermissions(deps, body));
         case 'list':
           if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);

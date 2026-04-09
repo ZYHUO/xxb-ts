@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { logger } from '../shared/logger.js';
 
 export interface TelegramUser {
@@ -26,7 +26,10 @@ export function validateInitData(initData: string, botToken: string): TelegramUs
     const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
     const computed = createHmac('sha256', secret).update(dataCheckString).digest('hex');
 
-    if (computed !== hash) return null;
+    // Constant-time comparison to prevent timing attacks
+    const computedBuf = Buffer.from(computed, 'hex');
+    const hashBuf = Buffer.from(hash, 'hex');
+    if (computedBuf.length !== hashBuf.length || !timingSafeEqual(computedBuf, hashBuf)) return null;
 
     // Check auth_date freshness (5 min window)
     const authDate = params.get('auth_date');

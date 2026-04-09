@@ -85,6 +85,10 @@ const envSchema = z.object({
     .string()
     .default('')
     .transform((s) => (s ? s.split(',') : [])),
+
+  // Cutover (optional — only used by scripts/cutover.sh)
+  TS_WEBHOOK_URL: z.string().url().optional(),
+  PHP_WEBHOOK_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

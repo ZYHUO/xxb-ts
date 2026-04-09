@@ -45,6 +45,19 @@ function createRedisMock() {
       }
       return 0;
     }),
+    set: vi.fn(async (key: string, value: string, ...args: unknown[]) => {
+      // Support NX flag: return null if key exists
+      const hasNx = args.some((a) => typeof a === 'string' && a.toUpperCase() === 'NX');
+      if (hasNx && counters.has(`__str:${key}`)) return null;
+      counters.set(`__str:${key}`, 1);
+      // Handle EX for TTL (just store, no actual expiry in mock)
+      return 'OK';
+    }),
+    del: vi.fn(async (key: string) => {
+      counters.delete(`__str:${key}`);
+      store.delete(key);
+      return 1;
+    }),
     incr: vi.fn(async (key: string) => {
       const val = (counters.get(key) ?? 0) + 1;
       counters.set(key, val);
