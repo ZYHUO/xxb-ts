@@ -242,14 +242,21 @@ function updateReflectionMeta(chatId: number): void {
 }
 
 function buildReflectionPrompt(outcomes: string, existing: string): string {
-  return `请根据以下回复效果记录，生成或更新自我反思总结。
+  return `你是一个 Telegram 群聊 bot 的自我分析模块。
+
+以下是你最近在一个群的回复效果记录（JSON 格式）：
+${outcomes}
 
 ${existing}
 
-最近的回复效果记录：
-${outcomes}
+请分析你的回复模式，找出规律：
+- 哪些类型的消息你不该回复但回了？（outcome 为 negative 的记录）
+- 哪些情况下你的回复受欢迎？（outcome 为 positive 的记录）
 
-请用简洁的中文总结你的回复策略中哪些有效、哪些需要改进。`;
+输出格式：用 3-5 条简短的规则描述你学到的经验教训。
+不要列举具体消息内容，只总结抽象规律。
+保持规则简短，每条不超过 30 字。
+只输出规则列表（每条以 - 开头），不要输出其他内容。`;
 }
 
 function now(): number {
