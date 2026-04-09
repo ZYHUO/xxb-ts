@@ -46,11 +46,8 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
   const { message: msg, botUid, botUsername, botNicknames, groupActivity, lastBotReplyIndex } = ctx;
   const text = msg.textContent || msg.captionContent || '';
 
-  // 1. Bot message → IGNORE (unless @self or reply to self)
+  // 1. Bot message → IGNORE (never reply to other bots to prevent loops)
   if (msg.isBot && msg.uid !== botUid) {
-    if (isMentioningSelf(text, botUsername, botNicknames) || isReplyToSelf(msg, botUid)) {
-      return makeResult('REPLY', 'bot_mentions_self');
-    }
     return makeResult('IGNORE', 'bot_message');
   }
 
