@@ -85,10 +85,10 @@ export async function generateReply(
         memberRoster = members
           .slice(0, 50) // cap at 50 members to save tokens
           .map(m => {
-            const tag = m.username ? `@${m.username}` : `#${m.uid}`;
-            return `${m.fullName}(${tag})`;
+            const tag = m.username ? `@${m.username}` : `uid:${m.uid}`;
+            return `${tag} = ${m.fullName}`;
           })
-          .join('、');
+          .join('\n');
       }
     } catch (err) {
       logger.debug({ err, chatId }, 'Failed to fetch member roster (non-critical)');
