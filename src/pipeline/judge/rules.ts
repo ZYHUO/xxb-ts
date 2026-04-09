@@ -10,6 +10,7 @@ export interface RuleContext {
   botUid: number;
   botUsername: string;
   botNicknames: string[];
+  chatId: number;
   groupActivity: { messagesLast5Min: number; messagesLast1Hour: number };
   lastBotReplyIndex: number; // how many messages ago bot last replied (-1 = never)
 }
@@ -75,6 +76,11 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
   // 5. Forwarded message → IGNORE
   if (msg.isForwarded) {
     return makeResult('IGNORE', 'forwarded');
+  }
+
+  // 5.5 Private chat → always REPLY (chatId > 0 = private)
+  if (ctx.chatId > 0) {
+    return makeResult('REPLY', 'private_chat');
   }
 
   // 6. Hot chat (5min ≥ 20 msgs) AND not mentioned → IGNORE

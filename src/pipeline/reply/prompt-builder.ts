@@ -39,6 +39,11 @@ function loadCachedPrompt(relativePath: string): string {
 export function buildSystemPrompt(action: JudgeAction): string {
   const layers: string[] = [];
 
+  // L0: Runtime context (current time)
+  const now = new Date();
+  const timeStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' });
+  layers.push(`# 当前时间\n\n${timeStr}（北京时间）`);
+
   // L1: Identity
   layers.push(loadCachedPrompt('identity/persona.md'));
 

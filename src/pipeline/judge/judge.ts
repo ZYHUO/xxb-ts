@@ -14,6 +14,7 @@ export interface JudgeInput {
   botUid: number;
   botUsername: string;
   botNicknames: string[];
+  chatId: number;
   groupActivity: { messagesLast5Min: number; messagesLast1Hour: number };
 }
 
@@ -37,6 +38,7 @@ export async function judge(input: JudgeInput): Promise<JudgeResult> {
     botUid: input.botUid,
     botUsername: input.botUsername,
     botNicknames: input.botNicknames,
+    chatId: input.chatId,
     groupActivity: input.groupActivity,
     lastBotReplyIndex: findLastBotReplyIndex(input.recentMessages, input.botUid),
   };

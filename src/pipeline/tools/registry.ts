@@ -27,16 +27,14 @@ export function buildToolSet(chatId: number, userId: number) {
     });
   }
 
-  // FETCH — fetch a web page
-  if (e.FETCH_GATEWAY_URL || e.FETCH_WORKER_URL) {
-    tools.FETCH = tool({
-      description: '抓取并读取指定URL的网页内容。当用户分享链接或需要读取特定网页时使用。',
-      parameters: z.object({
-        url: z.string().url().describe('要抓取的网页URL'),
-      }),
-      execute: async ({ url }) => executeFetch(url),
-    });
-  }
+  // FETCH — fetch a web page (always available via direct fetch)
+  tools.FETCH = tool({
+    description: '抓取并读取指定URL的网页内容。当用户分享链接或需要读取特定网页时使用。',
+    parameters: z.object({
+      url: z.string().url().describe('要抓取的网页URL'),
+    }),
+    execute: async ({ url }) => executeFetch(url),
+  });
 
   // IP_QUALITY — IP address quality check
   if (e.IP_QUALITY_API_URL) {

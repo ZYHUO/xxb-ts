@@ -99,6 +99,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     botUid: getBotUid(),
     botUsername: e.BOT_USERNAME,
     botNicknames: e.BOT_NICKNAMES,
+    chatId: job.chatId,
     groupActivity: { messagesLast5Min, messagesLast1Hour },
   });
   timings['judge'] = Math.round(performance.now() - t3);
