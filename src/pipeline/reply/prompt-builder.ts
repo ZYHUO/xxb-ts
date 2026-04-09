@@ -73,11 +73,16 @@ export function buildMessages(
   context: string,
   latestMessage: FormattedMessage,
   knowledge?: string,
+  checkinData?: string,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const userParts: string[] = [];
 
   if (knowledge) {
     userParts.push(`[知识库]\n${knowledge}`);
+  }
+
+  if (checkinData) {
+    userParts.push(checkinData);
   }
 
   userParts.push(`[群聊上下文]\n${context}`);

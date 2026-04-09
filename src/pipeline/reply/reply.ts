@@ -11,6 +11,7 @@ import { getKnowledge } from '../../knowledge/manager.js';
 import { generateWithTools } from '../tools/executor.js';
 import { parseReplyResponse } from './parser.js';
 import { getRecent } from '../context/manager.js';
+import { doCheckin } from '../checkin.js';
 import { logger } from '../../shared/logger.js';
 
 const MAX_DUPLICATE_RETRIES = 1;
@@ -60,8 +61,37 @@ export async function generateReply(
   // 3. Load knowledge
   const knowledge = getKnowledge(chatId) || undefined;
 
+  // 3.5 Checkin data injection — run checkin logic and inject results
+  let checkinData: string | undefined;
+  const msgText = message.textContent || '';
+  if (/^\/checkin(?:@\w+)?$/i.test(msgText.trim())) {
+    try {
+      const result = doCheckin(chatId, message.uid, message.username, message.fullName);
+      checkinData = result.isNew
+        ? `[签到系统数据 - 请用这些真实数据回复]\n` +
+          `签到状态: 签到成功！\n` +
+          `连续签到: ${result.streak}天\n` +
+          `累计签到: ${result.totalCheckins}次\n` +
+          `今日奖励: +${result.rewardCoins}喵币, +${result.rewardExp}经验\n` +
+          `幸运数字: ${result.luckyNumber}\n` +
+          `今日运势: ${result.fortune}\n` +
+          `今日排名: 第${result.rank}个签到（今日共${result.todayCheckins}人）`
+        : `[签到系统数据 - 请用这些真实数据回复]\n` +
+          `签到状态: 今天已经签过到了！\n` +
+          `连续签到: ${result.streak}天\n` +
+          `累计签到: ${result.totalCheckins}次\n` +
+          `今日奖励: ${result.rewardCoins}喵币, ${result.rewardExp}经验（已领取）\n` +
+          `幸运数字: ${result.luckyNumber}\n` +
+          `今日运势: ${result.fortune}\n` +
+          `今日排名: 第${result.rank}个签到（今日共${result.todayCheckins}人）`;
+      logger.debug({ chatId, uid: message.uid, isNew: result.isNew, streak: result.streak }, 'Checkin data injected');
+    } catch (err) {
+      logger.error({ err, chatId }, 'Checkin failed');
+    }
+  }
+
   // 4. Build messages array
-  const messages = buildMessages(systemPrompt, contextStr, message, knowledge);
+  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData);
 
   // 5. Call AI (with tool support via Vercel AI SDK)
   const usage = replyAction === 'REPLY_PRO' ? 'reply_pro' : 'reply';
