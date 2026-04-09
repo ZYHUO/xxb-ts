@@ -33,8 +33,8 @@ export function getLabel(name: string): AILabel {
 
 const USAGE_DEFAULTS: Record<string, AIUsage> = {
   judge: { label: 'judge', backups: ['reply'], timeout: 10_000, maxTokens: 100, temperature: 0 },
-  reply: { label: 'reply', backups: ['reply_pro'], timeout: 30_000 },
-  reply_pro: { label: 'reply_pro', backups: ['reply'], timeout: 60_000 },
+  reply: { label: 'reply', backups: ['reply_pro'], timeout: 60_000 },
+  reply_pro: { label: 'reply_pro', backups: ['reply'], timeout: 90_000 },
   vision: { label: 'vision', backups: [], timeout: 30_000 },
   summarize: { label: 'summarize', backups: ['reply'], timeout: 30_000 },
 };

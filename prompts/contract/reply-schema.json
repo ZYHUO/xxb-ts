@@ -1,25 +1,38 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ReplyOutput",
-  "description": "啾咪囝回复输出格式",
-  "type": "object",
-  "required": ["replyContent", "targetMessageId"],
-  "properties": {
-    "replyContent": {
-      "type": "string",
-      "description": "纯文本回复内容，禁止 Markdown / HTML",
-      "minLength": 1,
-      "maxLength": 4096
-    },
-    "targetMessageId": {
-      "type": "integer",
-      "description": "要回复的消息 ID"
-    },
-    "stickerIntent": {
-      "type": "string",
-      "enum": ["cute", "comfort", "tease", "happy", "sleepy"],
-      "description": "贴纸意图（绝大多数情况下省略，≤15% 频率）"
+  "description": "啾咪囝回复输出格式（单条对象或多条数组）",
+  "oneOf": [
+    { "$ref": "#/$defs/singleReply" },
+    {
+      "type": "array",
+      "items": { "$ref": "#/$defs/singleReply" },
+      "minItems": 1,
+      "maxItems": 5
     }
-  },
-  "additionalProperties": false
+  ],
+  "$defs": {
+    "singleReply": {
+      "type": "object",
+      "required": ["replyContent", "targetMessageId"],
+      "properties": {
+        "replyContent": {
+          "type": "string",
+          "description": "纯文本回复内容，禁止 Markdown / HTML",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "targetMessageId": {
+          "type": "integer",
+          "description": "要回复的消息 ID"
+        },
+        "stickerIntent": {
+          "type": "string",
+          "enum": ["cute", "comfort", "tease", "happy", "sleepy"],
+          "description": "贴纸意图（绝大多数情况下省略，≤15% 频率）"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

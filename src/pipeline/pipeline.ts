@@ -136,9 +136,9 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     );
     timings['retrieval'] = Math.round(performance.now() - t4);
 
-    // 8. Generate reply
+    // 8. Generate reply (returns array for multi-reply support)
     const t5 = performance.now();
-    const reply = await generateReply(
+    const replies = await generateReply(
       formatted,
       retrievedContext,
       judgeResult.action,
@@ -147,32 +147,50 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     );
     timings['reply'] = Math.round(performance.now() - t5);
 
-    // 9. Send to Telegram
+    // 9. Send all replies to Telegram
     const t6 = performance.now();
-    const sent = await sender.sendDirect(
-      job.chatId,
-      reply.replyContent,
-      reply.targetMessageId,
-    );
+    const sentMessages: Array<{ messageId: number; text: string }> = [];
+
+    for (const reply of replies) {
+      try {
+        const sent = await sender.sendDirect(
+          job.chatId,
+          reply.replyContent,
+          reply.targetMessageId,
+        );
+        sentMessages.push({ messageId: sent.messageId, text: reply.replyContent });
+      } catch (err) {
+        logger.error({ chatId: job.chatId, targetMessageId: reply.targetMessageId, err },
+          'Failed to send reply in multi-reply sequence');
+        // Continue sending remaining replies
+      }
+    }
     timings['send'] = Math.round(performance.now() - t6);
 
-    // 10. Save assistant message to context
+    if (sentMessages.length === 0) {
+      throw new Error('All replies failed to send');
+    }
+
+    // 10. Save ALL sent assistant messages to context
     const t7 = performance.now();
-    await addAssistant(job.chatId, {
-      textContent: reply.replyContent,
-      messageId: sent.messageId,
-    });
+    for (const sent of sentMessages) {
+      await addAssistant(job.chatId, {
+        textContent: sent.text,
+        messageId: sent.messageId,
+      });
+    }
     timings['saveAssistant'] = Math.round(performance.now() - t7);
 
-    // 11. Record reply outcome (pending)
-    if (e.OUTCOME_TRACKING_ENABLED) {
+    // 11. Record reply outcome for FIRST reply (primary)
+    if (e.OUTCOME_TRACKING_ENABLED && sentMessages.length > 0) {
+      const first = sentMessages[0]!;
       recordReply(
         job.chatId,
-        sent.messageId,
+        first.messageId,
         formatted.messageId,
         formatted.uid,
         formatted.textContent,
-        reply.replyContent,
+        first.text,
         judgeResult.action,
       ).catch((err) => {
         logger.debug({ err, chatId: job.chatId }, 'Outcome recording failed (non-critical)');
@@ -184,7 +202,8 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       chatId: job.chatId,
       messageId: formatted.messageId,
       action: judgeResult.action,
-      replyMsgId: sent.messageId,
+      replyCount: sentMessages.length,
+      replyMsgIds: sentMessages.map(s => s.messageId),
       totalMs,
       timings,
     }, 'Pipeline complete');

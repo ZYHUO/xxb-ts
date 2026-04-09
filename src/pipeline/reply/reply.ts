@@ -47,7 +47,7 @@ export async function generateReply(
   action: JudgeAction,
   chatId: number,
   botUid: number,
-): Promise<ReplyOutput> {
+): Promise<ReplyOutput[]> {
   const start = performance.now();
   const replyAction = action === 'REPLY_PRO' ? 'REPLY_PRO' : 'REPLY';
 
@@ -84,18 +84,18 @@ export async function generateReply(
 
   let result = await generateWithTools(messages, chatId, message.uid, usage);
 
-  // 6. Parse response
-  let parsed = parseReplyResponse(result.content, message.messageId);
+  // 6. Parse response (now returns array)
+  let parsedReplies = parseReplyResponse(result.content, message.messageId);
 
-  // 7. Duplicate detection — retry once with different temperature
-  if (await isDuplicateReply(chatId, parsed.replyContent)) {
+  // 7. Duplicate detection — check first reply only (the main content)
+  if (parsedReplies[0] && await isDuplicateReply(chatId, parsedReplies[0].replyContent)) {
     logger.info({ chatId }, 'Duplicate reply detected, regenerating');
     for (let i = 0; i < MAX_DUPLICATE_RETRIES; i++) {
       result = await generateWithTools(messages, chatId, message.uid, usage, {
         temperatureOverride: 1.2,
       });
-      parsed = parseReplyResponse(result.content, message.messageId);
-      if (!(await isDuplicateReply(chatId, parsed.replyContent))) break;
+      parsedReplies = parseReplyResponse(result.content, message.messageId);
+      if (!parsedReplies[0] || !(await isDuplicateReply(chatId, parsedReplies[0].replyContent))) break;
     }
   }
 
@@ -106,12 +106,13 @@ export async function generateReply(
     model: result.model,
     tokens: result.tokenUsage.total,
     latencyMs,
-    replyLength: parsed.replyContent.length,
-  }, 'Reply generated');
+    replyCount: parsedReplies.length,
+    replyLength: parsedReplies.map(r => r.replyContent.length),
+  }, `Reply generated (${parsedReplies.length} message(s))`);
 
-  return {
-    replyContent: parsed.replyContent,
-    targetMessageId: parsed.targetMessageId,
-    stickerIntent: parsed.stickerIntent,
-  };
+  return parsedReplies.map(p => ({
+    replyContent: p.replyContent,
+    targetMessageId: p.targetMessageId,
+    stickerIntent: p.stickerIntent,
+  }));
 }

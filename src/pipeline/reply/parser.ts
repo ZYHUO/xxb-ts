@@ -128,26 +128,46 @@ function tryXmlParse(raw: string): Record<string, unknown> | null {
   return result;
 }
 
-/**
- * Parse AI response into ReplyOutput.
- *
- * Parse order:
- * 1. Direct JSON
- * 2. JSON in markdown code block
- * 3. XML with CDATA (PHP compatibility)
- * 4. Plain text fallback
- */
-export function parseReplyResponse(raw: string, fallbackMessageId: number): ParsedReply {
-  const trimmed = raw.trim();
+const MAX_MULTI_REPLIES = 5;
 
-  if (!trimmed) {
-    logger.warn('Empty AI response, using fallback');
-    return { replyContent: '…', targetMessageId: fallbackMessageId };
+/**
+ * Try to parse raw string as a JSON array of reply objects.
+ */
+function tryArrayParse(raw: string, fallbackMessageId: number): ParsedReply[] | null {
+  let arr: unknown = null;
+
+  // Direct JSON array
+  try { arr = JSON.parse(raw); } catch { /* ignore */ }
+
+  // Try code block
+  if (!Array.isArray(arr)) {
+    const match = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/i);
+    if (match?.[1]) {
+      try { arr = JSON.parse(match[1].trim()); } catch { /* ignore */ }
+    }
   }
 
-  // 1. Try direct JSON parse
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+
+  // Validate each item
+  const results: ParsedReply[] = [];
+  for (const item of arr) {
+    if (typeof item !== 'object' || item === null) return null;
+    const validated = validateAndReturn(item as Record<string, unknown>, fallbackMessageId);
+    if (!validated) return null; // If ANY item fails, reject entire array
+    results.push(validated);
+  }
+
+  return results.length > 0 && results.length <= MAX_MULTI_REPLIES ? results : null;
+}
+
+/**
+ * Parse single reply from AI response (existing logic).
+ */
+function parseSingleReply(trimmed: string, fallbackMessageId: number): ParsedReply {
+  // 1. Try direct JSON parse (object only)
   const json = tryJsonParse(trimmed);
-  if (json) {
+  if (json && !Array.isArray(json)) {
     const validated = validateAndReturn(json, fallbackMessageId);
     if (validated) return validated;
   }
@@ -172,6 +192,38 @@ export function parseReplyResponse(raw: string, fallbackMessageId: number): Pars
     replyContent: normalizeWhitespace(trimmed),
     targetMessageId: fallbackMessageId,
   });
+}
+
+/**
+ * Parse AI response into array of ReplyOutput.
+ * Supports both single object and array of objects.
+ *
+ * Parse order:
+ * 1. JSON array (multi-reply)
+ * 2. Direct JSON object
+ * 3. JSON in markdown code block
+ * 4. XML with CDATA (PHP compatibility)
+ * 5. Plain text fallback
+ *
+ * Always returns an array (single reply is wrapped in [reply]).
+ */
+export function parseReplyResponse(raw: string, fallbackMessageId: number): ParsedReply[] {
+  const trimmed = raw.trim();
+
+  if (!trimmed) {
+    logger.warn('Empty AI response, using fallback');
+    return [{ replyContent: '…', targetMessageId: fallbackMessageId }];
+  }
+
+  // 1. Try array parse first (multi-reply)
+  const arrayResult = tryArrayParse(trimmed, fallbackMessageId);
+  if (arrayResult) {
+    logger.debug({ count: arrayResult.length }, 'Parsed multi-reply array');
+    return arrayResult;
+  }
+
+  // 2. Fall back to single reply (wrapped in array)
+  return [parseSingleReply(trimmed, fallbackMessageId)];
 }
 
 /** Truncate replyContent to Telegram's 4096-char limit */
