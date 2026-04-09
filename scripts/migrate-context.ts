@@ -135,8 +135,28 @@ async function main(): Promise<void> {
     const tsKey = TS_PREFIX + chatIdStr;
 
     try {
-      // PHP stores context as a Redis list of JSON strings
-      const rawMessages = await redis.lrange(phpKey, 0, -1);
+      // PHP stores context as a Redis string (JSON array) or a Redis list
+      const keyType = await redis.type(phpKey);
+      let rawMessages: string[];
+
+      if (keyType === 'string') {
+        // PHP format: single string containing a JSON array
+        const raw = await redis.get(phpKey);
+        if (!raw) continue;
+        try {
+          const arr = JSON.parse(raw) as PhpMessage[];
+          rawMessages = arr.map((m) => JSON.stringify(m));
+        } catch {
+          console.error(`Failed to parse JSON string for ${phpKey}`);
+          errors++;
+          continue;
+        }
+      } else if (keyType === 'list') {
+        rawMessages = await redis.lrange(phpKey, 0, -1);
+      } else {
+        console.warn(`Unexpected key type '${keyType}' for ${phpKey}, skipping`);
+        continue;
+      }
 
       if (rawMessages.length === 0) continue;
 

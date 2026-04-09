@@ -10,10 +10,10 @@ export async function createBot(): Promise<Bot> {
   if (!_bot) {
     _bot = new Bot(env().BOT_TOKEN);
 
-    // Fetch bot identity for UID-based rule matching
-    const me = await _bot.api.getMe();
-    _botUid = me.id;
-    logger.info({ botUid: _botUid, username: me.username }, 'Bot identity fetched');
+    // Initialize bot (required for webhook mode handleUpdate)
+    await _bot.init();
+    _botUid = _bot.botInfo.id;
+    logger.info({ botUid: _botUid, username: _bot.botInfo.username }, 'Bot identity fetched');
 
     registerMessageHandler(_bot);
 
