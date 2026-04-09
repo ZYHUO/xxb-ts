@@ -46,6 +46,8 @@ const envSchema = z.object({
 
   // Tool System
   SEARXNG_URL: z.string().url().optional(),
+  XAI_API_KEY: z.string().optional(),
+  XAI_SEARCH_MODEL: z.string().default('grok-4-0709'),
   FETCH_GATEWAY_URL: z.string().optional(),
   FETCH_WORKER_URL: z.string().url().optional(),
   WEB_FETCH_USER_AGENT: z.string().default('XXB-WebFetch/1.0'),

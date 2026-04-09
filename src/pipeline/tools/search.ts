@@ -1,5 +1,5 @@
 // ────────────────────────────────────────
-// Web search tool — DuckDuckGo HTML scraping + SearxNG fallback
+// Web search tool — xAI Responses API (primary) + DDG Lite fallback
 // ────────────────────────────────────────
 
 import { env } from '../../env.js';
@@ -11,16 +11,71 @@ const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 export async function executeSearch(query: string): Promise<string> {
   const e = env();
 
-  // Route 1: SearxNG if configured
+  // Route 1: xAI Responses API with web_search (best quality)
+  if (e.XAI_API_KEY) {
+    try {
+      return await xaiSearch(query, e.XAI_API_KEY, e.XAI_SEARCH_MODEL);
+    } catch (err) {
+      logger.warn({ err, query }, 'xAI search failed, falling back');
+    }
+  }
+
+  // Route 2: SearxNG if configured
   if (e.SEARXNG_URL) {
     return searxngSearch(query, e.SEARXNG_URL);
   }
 
-  // Route 2: DuckDuckGo HTML scraping (always available)
-  return ddgSearch(query);
+  // Route 3: DDG Lite (always available)
+  return ddgLiteSearch(query);
 }
 
-// ── DuckDuckGo HTML search ──
+// ── xAI Responses API search ──
+
+interface XaiResponse {
+  output?: Array<{
+    type: string;
+    content?: Array<{ type: string; text?: string }>;
+  }>;
+  error?: string;
+}
+
+async function xaiSearch(query: string, apiKey: string, model: string): Promise<string> {
+  const res = await fetch('https://api.x.ai/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      input: query,
+      tools: [{ type: 'web_search' }],
+      max_output_tokens: 500,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`xAI API ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as XaiResponse;
+
+  for (const item of data.output ?? []) {
+    if (item.type === 'message' && item.content) {
+      for (const block of item.content) {
+        if (block.type === 'output_text' && block.text) {
+          return block.text;
+        }
+      }
+    }
+  }
+
+  return `没有找到与"${query}"相关的结果。`;
+}
+
+// ── DuckDuckGo Lite search ──
 
 interface SearchResult {
   title: string;
@@ -28,10 +83,9 @@ interface SearchResult {
   snippet: string;
 }
 
-async function ddgSearch(query: string): Promise<string> {
+async function ddgLiteSearch(query: string): Promise<string> {
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
+    const res = await fetch('https://lite.duckduckgo.com/lite/', {
       method: 'POST',
       headers: {
         'User-Agent': UA,
@@ -44,7 +98,7 @@ async function ddgSearch(query: string): Promise<string> {
     if (!res.ok) return `搜索失败: DuckDuckGo 返回 ${res.status}`;
 
     const html = await res.text();
-    const results = parseDdgHtml(html);
+    const results = parseDdgLiteHtml(html);
 
     if (!results.length) return `没有找到与"${query}"相关的结果。`;
 
@@ -54,41 +108,39 @@ async function ddgSearch(query: string): Promise<string> {
     }
     return output;
   } catch (err) {
-    logger.error({ err, query }, 'DDG search failed');
+    logger.error({ err, query }, 'DDG Lite search failed');
     return `搜索失败: ${err instanceof Error ? err.message : String(err)}`;
   }
 }
 
-function parseDdgHtml(html: string): SearchResult[] {
+function parseDdgLiteHtml(html: string): SearchResult[] {
   const results: SearchResult[] = [];
 
-  // Match result blocks: each has class="result"
-  const resultBlocks = html.split(/class="result\s/);
+  // DDG Lite format: <a rel="nofollow" href="URL" class='result-link'>TITLE</a>
+  // followed later by <td class='result-snippet'>SNIPPET</td>
+  const linkPattern = /<a rel="nofollow" href="([^"]+)" class='result-link'>([\s\S]*?)<\/a>/g;
+  const snippetPattern = /class='result-snippet'>([\s\S]*?)<\/td>/g;
 
-  for (const block of resultBlocks.slice(1)) { // skip before first result
-    // Title: <a class="result__a" ...>TITLE</a>
-    const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/);
-    // URL: <a class="result__url" ...>URL</a>
-    const urlMatch = block.match(/class="result__url"[^>]*href="([^"]*)"/) ||
-                     block.match(/class="result__url"[^>]*>([\s\S]*?)<\/a>/);
-    // Snippet: <a class="result__snippet" ...>SNIPPET</a> or <td class="result__snippet">
-    const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|td)>/);
+  const links: Array<{ url: string; title: string }> = [];
+  let m: RegExpExecArray | null;
 
-    if (titleMatch?.[1]) {
-      const title = stripTags(titleMatch[1]).trim();
-      let url = '';
-      if (urlMatch?.[1]) {
-        url = stripTags(urlMatch[1]).trim();
-        if (url.startsWith('//')) url = `https:${url}`;
-        // DDG encodes URLs through redirect, try to extract actual URL
-        const uddg = url.match(/uddg=([^&]+)/);
-        if (uddg?.[1]) url = decodeURIComponent(uddg[1]);
-      }
-      const snippet = snippetMatch?.[1] ? stripTags(snippetMatch[1]).trim() : '';
+  while ((m = linkPattern.exec(html)) !== null) {
+    links.push({
+      url: m[1],
+      title: stripTags(m[2]).trim(),
+    });
+  }
 
-      if (title && (url || snippet)) {
-        results.push({ title, url, snippet });
-      }
+  const snippets: string[] = [];
+  while ((m = snippetPattern.exec(html)) !== null) {
+    snippets.push(stripTags(m[1]).trim());
+  }
+
+  for (let i = 0; i < links.length; i++) {
+    const { url, title } = links[i];
+    const snippet = i < snippets.length ? snippets[i] : '';
+    if (title && url) {
+      results.push({ title, url, snippet });
     }
   }
 
