@@ -1,0 +1,65 @@
+// ────────────────────────────────────────
+// 全局类型定义
+// ────────────────────────────────────────
+
+export interface FormattedMessage {
+  role: 'user' | 'assistant' | 'system';
+  uid: number;
+  username: string;
+  fullName: string;
+  timestamp: number;
+  messageId: number;
+  textContent: string;
+  captionContent?: string;
+  sticker?: {
+    emoji: string;
+    fileId: string;
+    fileUniqueId: string;
+    setName?: string;
+    isAnimated?: boolean;
+    isVideo?: boolean;
+  };
+  replyTo?: { messageId: number; uid: number; fullName: string; textSnippet: string };
+  isForwarded: boolean;
+  forwardFrom?: string;
+  imageFileId?: string;
+  imageDescriptions?: string[];
+  isBot?: boolean;
+}
+
+export type JudgeAction = 'REPLY' | 'REPLY_PRO' | 'IGNORE' | 'REJECT';
+
+export interface JudgeResult {
+  action: JudgeAction;
+  level: 'L0_RULE' | 'L1_MICRO' | 'L2_AI';
+  rule?: string;
+  confidence?: number;
+  reasoning?: string;
+  latencyMs: number;
+}
+
+export interface ReplyOutput {
+  replyContent: string;
+  targetMessageId: number;
+  stickerIntent?:
+    | 'cute' | 'comfort' | 'tease' | 'happy' | 'sleepy'
+    | 'curious' | 'playful' | 'confused' | 'shy' | 'sad'
+    | 'smug' | 'annoyed' | 'dramatic' | 'cozy' | 'love';
+}
+
+export interface RetrievedContext {
+  recent: FormattedMessage[];
+  semantic: FormattedMessage[];
+  thread: FormattedMessage[];
+  entity: FormattedMessage[];
+  merged: FormattedMessage[];
+  tokenCount: number;
+}
+
+export interface ChatJob {
+  type: 'message' | 'allowlist_review';
+  chatId: number;
+  messageId?: number;
+  update: Record<string, unknown>;
+  enqueuedAt: number;
+}
