@@ -46,9 +46,37 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
   const { message: msg, botUid, botUsername, botNicknames, groupActivity, lastBotReplyIndex } = ctx;
   const text = msg.textContent || msg.captionContent || '';
 
-  // 1. Bot message → always ignore (prevent bot-to-bot loops)
+  // 1. Bot message — check if humans are present before engaging
   if (msg.isBot && msg.uid !== botUid) {
-    return makeResult('IGNORE', 'bot_message');
+    // Only consider replying if bot mentions us or replies to us
+    if (!isMentioningSelf(text, botUsername, botNicknames) && !isReplyToSelf(msg, botUid)) {
+      return makeResult('IGNORE', 'bot_message');
+    }
+
+    // Check if any human has spoken recently — if so, disengage from bot chat
+    // Look through recent messages for any human activity
+    let humanSeenSinceLastBotExchange = false;
+    let consecutiveBotMsgs = 0;
+    for (let i = ctx.recentMessages.length - 1; i >= 0; i--) {
+      const m = ctx.recentMessages[i]!;
+      if (!m.isBot && m.role !== 'assistant' && m.uid !== botUid) {
+        humanSeenSinceLastBotExchange = true;
+        break;
+      }
+      consecutiveBotMsgs++;
+    }
+
+    // If a human has sent a message recently, stop engaging with bots
+    if (humanSeenSinceLastBotExchange) {
+      return makeResult('IGNORE', 'bot_human_present');
+    }
+
+    // No human present — use decay to prevent infinite bot-to-bot loops
+    // Much stricter: 1 reply max, then stop
+    if (consecutiveBotMsgs >= 2) {
+      return makeResult('IGNORE', 'bot_fatigue');
+    }
+    return makeResult('REPLY', 'bot_mentions_self');
   }
 
   // 2. Reply to self → REPLY
