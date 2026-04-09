@@ -61,29 +61,15 @@ export async function generateReply(
   // 3. Load knowledge
   const knowledge = getKnowledge(chatId) || undefined;
 
-  // 3.5 Checkin data injection — run checkin logic and inject results
+  // 3.5 Checkin data injection — minimal real data, AI creates the rest
   let checkinData: string | undefined;
   const msgText = message.textContent || '';
   if (/^\/checkin(?:@\w+)?$/i.test(msgText.trim())) {
     try {
       const result = doCheckin(chatId, message.uid, message.username, message.fullName);
       checkinData = result.isNew
-        ? `[签到系统数据 - 请用这些真实数据回复]\n` +
-          `签到状态: 签到成功！\n` +
-          `连续签到: ${result.streak}天\n` +
-          `累计签到: ${result.totalCheckins}次\n` +
-          `今日奖励: +${result.rewardCoins}喵币, +${result.rewardExp}经验\n` +
-          `幸运数字: ${result.luckyNumber}\n` +
-          `今日运势: ${result.fortune}\n` +
-          `今日排名: 第${result.rank}个签到（今日共${result.todayCheckins}人）`
-        : `[签到系统数据 - 请用这些真实数据回复]\n` +
-          `签到状态: 今天已经签过到了！\n` +
-          `连续签到: ${result.streak}天\n` +
-          `累计签到: ${result.totalCheckins}次\n` +
-          `今日奖励: ${result.rewardCoins}喵币, ${result.rewardExp}经验（已领取）\n` +
-          `幸运数字: ${result.luckyNumber}\n` +
-          `今日运势: ${result.fortune}\n` +
-          `今日排名: 第${result.rank}个签到（今日共${result.todayCheckins}人）`;
+        ? `[签到系统] 签到成功！连续${result.streak}天，累计${result.totalCheckins}次，今日第${result.rank}个。请自由发挥奖励、运势等有趣内容。`
+        : `[签到系统] 今天已经签过了！连续${result.streak}天，累计${result.totalCheckins}次，今日第${result.rank}个。提醒TA别重复签。`;
       logger.debug({ chatId, uid: message.uid, isNew: result.isNew, streak: result.streak }, 'Checkin data injected');
     } catch (err) {
       logger.error({ err, chatId }, 'Checkin failed');
