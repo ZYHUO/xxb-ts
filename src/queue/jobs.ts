@@ -8,6 +8,7 @@ export interface MessageJobData {
   type: 'message' | 'allowlist_review';
   chatId: number;
   messageId?: number;
+  isEdit?: boolean;
   update: Record<string, unknown>;
   enqueuedAt: number;
 }

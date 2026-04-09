@@ -95,17 +95,30 @@ async function main(): Promise<void> {
     });
   }
 
-  serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
+  const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
     logger.info({ port: info.port }, 'HTTP server listening');
   });
 
   // 12. Start cron jobs
-  startCronJobs();
+  startCronJobs({ cleanupDeps: { redis, allowlistConfig } });
 
   // 13. Graceful shutdown
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
     logger.info({ signal }, 'Shutting down…');
+
+    // Force exit after 15 seconds if graceful shutdown hangs
+    const forceTimer = setTimeout(() => {
+      logger.error('Forced exit after shutdown timeout');
+      process.exit(1);
+    }, 15_000);
+    forceTimer.unref();
+
     try {
+      server.close();
       await stopBot();
       await closeWorker();
       await closeQueue();

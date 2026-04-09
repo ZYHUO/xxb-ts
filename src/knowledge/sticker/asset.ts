@@ -12,6 +12,14 @@ function getAssetRoot(): string {
   return process.env['STICKER_ASSET_ROOT'] ?? DEFAULT_ASSET_ROOT;
 }
 
+const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function assertSafeId(fileUniqueId: string): void {
+  if (!SAFE_ID_PATTERN.test(fileUniqueId)) {
+    throw new Error(`Invalid fileUniqueId: ${fileUniqueId}`);
+  }
+}
+
 export function buildAssetPaths(
   fileUniqueId: string,
   format: string,
@@ -21,6 +29,7 @@ export function buildAssetPaths(
   rawPath: string;
   previewPath: string;
 } {
+  assertSafeId(fileUniqueId);
   const root = getAssetRoot();
   const ext = formatToExt(format);
   return {

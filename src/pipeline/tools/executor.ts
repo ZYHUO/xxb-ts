@@ -17,6 +17,7 @@ export async function generateWithTools(
   chatId: number,
   userId: number,
   usage: string,
+  opts?: { temperatureOverride?: number },
 ): Promise<AICallResult & { toolsUsed: string[] }> {
   const start = performance.now();
   const usageConfig = getUsage(usage);
@@ -34,7 +35,7 @@ export async function generateWithTools(
     tools,
     maxSteps: MAX_TOOL_STEPS,
     maxTokens: usageConfig.maxTokens,
-    temperature: usageConfig.temperature,
+    temperature: opts?.temperatureOverride ?? usageConfig.temperature,
     abortSignal: usageConfig.timeout ? AbortSignal.timeout(usageConfig.timeout) : undefined,
   });
 

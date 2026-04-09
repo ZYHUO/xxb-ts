@@ -325,12 +325,8 @@ export function getReadyStickersByIntent(
   const candidates: Array<{ fileId: string; score: number }> = [];
 
   for (const row of rows) {
-    const emotionTags = row.emotion_tags
-      ? (JSON.parse(row.emotion_tags) as string[])
-      : [];
-    const moodMap = row.mood_map
-      ? (JSON.parse(row.mood_map) as Record<string, number>)
-      : {};
+    const emotionTags = safeJsonParse<string[]>(row.emotion_tags, null) ?? [];
+    const moodMap = safeJsonParse<Record<string, number>>(row.mood_map, null) ?? {};
 
     const score = scoreIntentMatch(intent, emotionTags, moodMap);
     if (score > 0) {

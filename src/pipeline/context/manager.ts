@@ -8,27 +8,43 @@ import { env } from '../../env.js';
 
 const CTX_PREFIX = 'xxb:ctx:';
 const TRUNCATE_SIZE = 50;
+const CTX_TTL = 7 * 86400; // 7 days rolling TTL
 
-function key(chatId: number): string {
+// Atomic rpush + trim + expire via Lua
+const RPUSH_TRIM_LUA = `
+local key = KEYS[1]
+redis.call('RPUSH', key, ARGV[1])
+local len = redis.call('LLEN', key)
+local maxLen = tonumber(ARGV[2])
+local trimSize = tonumber(ARGV[3])
+if len > maxLen then
+  redis.call('LTRIM', key, len - trimSize, -1)
+end
+redis.call('EXPIRE', key, tonumber(ARGV[4]))
+return len
+`;
+
+function ctxKey(chatId: number): string {
   return CTX_PREFIX + chatId;
 }
 
 export async function addMessage(chatId: number, message: FormattedMessage): Promise<void> {
   const redis = getRedis();
-  const k = key(chatId);
-  await redis.rpush(k, JSON.stringify(message));
-
-  // Trim if exceeds max length
   const maxLen = env().CONTEXT_MAX_LENGTH;
-  const len = await redis.llen(k);
-  if (len > maxLen) {
-    await redis.ltrim(k, len - (maxLen - TRUNCATE_SIZE), -1);
-  }
+  await redis.eval(
+    RPUSH_TRIM_LUA,
+    1,
+    ctxKey(chatId),
+    JSON.stringify(message),
+    String(maxLen),
+    String(maxLen - TRUNCATE_SIZE),
+    String(CTX_TTL),
+  );
 }
 
 export async function getRecent(chatId: number, count: number): Promise<FormattedMessage[]> {
   const redis = getRedis();
-  const raw = await redis.lrange(key(chatId), -count, -1);
+  const raw = await redis.lrange(ctxKey(chatId), -count, -1);
   return raw.map((r) => JSON.parse(r) as FormattedMessage);
 }
 
@@ -39,7 +55,7 @@ export async function getRecentCount(chatId: number, count: number): Promise<For
 
 export async function getAll(chatId: number): Promise<FormattedMessage[]> {
   const redis = getRedis();
-  const raw = await redis.lrange(key(chatId), 0, -1);
+  const raw = await redis.lrange(ctxKey(chatId), 0, -1);
   return raw.map((r) => JSON.parse(r) as FormattedMessage);
 }
 

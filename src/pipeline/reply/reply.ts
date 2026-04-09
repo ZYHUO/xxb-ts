@@ -75,7 +75,9 @@ export async function generateReply(
   if (await isDuplicateReply(chatId, parsed.replyContent)) {
     logger.info({ chatId }, 'Duplicate reply detected, regenerating');
     for (let i = 0; i < MAX_DUPLICATE_RETRIES; i++) {
-      result = await generateWithTools(messages, chatId, message.uid, usage);
+      result = await generateWithTools(messages, chatId, message.uid, usage, {
+        temperatureOverride: 1.2,
+      });
       parsed = parseReplyResponse(result.content, message.messageId);
       if (!(await isDuplicateReply(chatId, parsed.replyContent))) break;
     }

@@ -11,12 +11,21 @@ async function handleUpdate(ctx: Context): Promise<void> {
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
   const userId = msg.from?.id;
+  const isEdit = !!ctx.editedMessage;
 
-  // Dedup
-  if (await isDuplicate(chatId, messageId)) return;
+  // Dedup (fail-open on Redis error to avoid silent message loss)
+  try {
+    if (await isDuplicate(chatId, messageId, isEdit)) return;
+  } catch (err) {
+    logger.warn({ err, chatId, messageId }, 'Dedup check failed, proceeding');
+  }
 
-  // Rate limit
-  if (userId && (await isRateLimited(userId))) return;
+  // Rate limit (fail-open on Redis error)
+  try {
+    if (userId && (await isRateLimited(userId))) return;
+  } catch (err) {
+    logger.warn({ err, userId }, 'Rate limit check failed, proceeding');
+  }
 
   logger.info(
     {
@@ -33,6 +42,7 @@ async function handleUpdate(ctx: Context): Promise<void> {
     type: 'message',
     chatId,
     messageId,
+    isEdit,
     update: ctx.update as unknown as Record<string, unknown>,
     enqueuedAt: Date.now(),
   });

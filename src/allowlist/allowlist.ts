@@ -21,8 +21,13 @@ export async function isGroupAllowed(
   if (!config.enabled) return true;
   const raw = await redis.hget(`${config.redisPrefix}groups`, String(chatId));
   if (!raw) return false;
-  const record = JSON.parse(raw) as GroupRecord;
-  return record.approved && record.enabled;
+  try {
+    const record = JSON.parse(raw) as GroupRecord;
+    return record.approved && record.enabled;
+  } catch {
+    logger.warn({ chatId }, 'Corrupt group record in allowlist, denying access');
+    return false;
+  }
 }
 
 export async function getGroupRecord(
@@ -57,11 +62,30 @@ export async function submit(
     return { ok: false, error: 'already_registered' };
   }
 
-  // 3. Already pending
+  // 3. Atomic dedup: try to acquire a per-chat pending lock
+  const dedupKey = `${config.redisPrefix}submit_lock:${params.chatId}`;
+  const lockAcquired = await redis.set(dedupKey, '1', 'EX', 300, 'NX');
+  if (!lockAcquired) {
+    // Check if it's actually pending or just a stale lock
+    const allPending = await redis.hgetall(`${config.redisPrefix}pending`);
+    for (const json of Object.values(allPending)) {
+      const p = JSON.parse(json) as PendingRequest;
+      if (p.chat_id === params.chatId) {
+        return { ok: false, error: 'already_pending' };
+      }
+    }
+    // Stale lock, clean up and retry once
+    await redis.del(dedupKey);
+    const retryLock = await redis.set(dedupKey, '1', 'EX', 300, 'NX');
+    if (!retryLock) return { ok: false, error: 'already_pending' };
+  }
+
+  // Also scan pending to catch edge cases
   const allPending = await redis.hgetall(`${config.redisPrefix}pending`);
   for (const json of Object.values(allPending)) {
     const p = JSON.parse(json) as PendingRequest;
     if (p.chat_id === params.chatId) {
+      await redis.del(dedupKey);
       return { ok: false, error: 'already_pending' };
     }
   }
@@ -225,4 +249,33 @@ export async function removeGroup(
 ): Promise<boolean> {
   const deleted = await redis.hdel(`${config.redisPrefix}groups`, String(chatId));
   return deleted > 0;
+}
+
+const REVIEWED_MAX_AGE_SECONDS = 30 * 86400; // 30 days
+
+/** Prune reviewed entries older than 30 days to prevent unbounded growth */
+export async function pruneReviewed(
+  redis: Redis,
+  config: AllowlistConfig,
+): Promise<number> {
+  const all = await redis.hgetall(`${config.redisPrefix}reviewed`);
+  const cutoff = Math.floor(Date.now() / 1000) - REVIEWED_MAX_AGE_SECONDS;
+  const toDelete: string[] = [];
+
+  for (const [key, json] of Object.entries(all)) {
+    try {
+      const entry = JSON.parse(json) as PendingRequest;
+      if (entry.created_at < cutoff) {
+        toDelete.push(key);
+      }
+    } catch {
+      toDelete.push(key); // corrupt entry, remove
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await redis.hdel(`${config.redisPrefix}reviewed`, ...toDelete);
+    logger.info({ count: toDelete.length }, 'Pruned old reviewed entries');
+  }
+  return toDelete.length;
 }

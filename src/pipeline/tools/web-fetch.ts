@@ -5,15 +5,61 @@
 
 import { env } from '../../env.js';
 import { logger } from '../../shared/logger.js';
+import { lookup } from 'dns/promises';
 
 const MAX_OUTPUT = 3200;
 const MAX_FETCH_BYTES = 512 * 1024; // 512KB max download
+
+// Blocked private/internal IP ranges
+const BLOCKED_RANGES = [
+  /^127\./,                       // 127.0.0.0/8 loopback
+  /^10\./,                        // 10.0.0.0/8
+  /^172\.(1[6-9]|2\d|3[01])\./,  // 172.16.0.0/12
+  /^192\.168\./,                  // 192.168.0.0/16
+  /^169\.254\./,                  // 169.254.0.0/16 link-local
+  /^0\./,                         // 0.0.0.0/8
+  /^::1$/,                        // IPv6 loopback
+  /^fd[0-9a-f]{2}:/i,            // IPv6 ULA
+  /^fe80:/i,                      // IPv6 link-local
+];
+
+function isPrivateIp(ip: string): boolean {
+  return BLOCKED_RANGES.some((r) => r.test(ip));
+}
+
+async function validateUrl(url: string): Promise<string | null> {
+  const parsed = new URL(url);
+  const hostname = parsed.hostname;
+
+  // Block direct IP
+  if (isPrivateIp(hostname)) return `Blocked private IP: ${hostname}`;
+
+  // Block localhost variants
+  if (hostname === 'localhost' || hostname === '[::1]') return 'Blocked: localhost';
+
+  // DNS resolve to check actual IP
+  try {
+    const { address } = await lookup(hostname);
+    if (isPrivateIp(address)) return `Blocked: ${hostname} resolves to private IP ${address}`;
+  } catch {
+    // DNS failure — allow through (will fail on fetch anyway)
+  }
+
+  return null;
+}
 
 export async function executeFetch(url: string): Promise<string> {
   try {
     new URL(url);
   } catch {
     return '无效的URL格式';
+  }
+
+  // SSRF protection: block private/internal addresses
+  const blocked = await validateUrl(url);
+  if (blocked) {
+    logger.warn({ url, reason: blocked }, 'SSRF blocked');
+    return '无法访问该地址';
   }
 
   const e = env();

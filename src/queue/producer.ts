@@ -28,8 +28,9 @@ export function getQueue(): Queue<MessageJobData> {
 
 export async function enqueue(data: MessageJobData): Promise<string | undefined> {
   const queue = getQueue();
+  const editSuffix = data.isEdit ? ':edit' : '';
   const jobId = data.messageId
-    ? `msg:${data.chatId}:${data.messageId}`
+    ? `msg:${data.chatId}:${data.messageId}${editSuffix}`
     : `msg:${data.chatId}:${Date.now()}`;
 
   const job = await queue.add(data.type, data, { jobId });
