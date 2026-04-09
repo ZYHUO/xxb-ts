@@ -14,6 +14,7 @@ import { sendChatAction } from '../bot/sender/telegram.js';
 import { getBotUid } from '../bot/bot.js';
 import { recordMessage as recordActivity } from '../tracking/activity.js';
 import { getBotTracker } from '../tracking/interaction.js';
+import { tryGenerateDigest } from '../tracking/bot-digest.js';
 import { recordReply, checkOutcome } from '../tracking/outcome.js';
 import { env } from '../env.js';
 import { logger } from '../shared/logger.js';
@@ -73,6 +74,11 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     } catch (err) {
       logger.debug({ err, chatId: job.chatId }, 'Bot interaction tracking failed (non-critical)');
     }
+
+    // Fire-and-forget digest generation if enough records accumulated
+    tryGenerateDigest(job.chatId, formatted.username).catch((err) => {
+      logger.debug({ err, chatId: job.chatId }, 'Bot digest generation failed (non-critical)');
+    });
   }
 
   // 3.7 Check reply outcomes
