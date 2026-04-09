@@ -110,17 +110,19 @@ async function main(): Promise<void> {
 
     logger.info({ signal }, 'Shutting down…');
 
-    // Force exit after 15 seconds if graceful shutdown hangs
+    // Force exit after 30 seconds if graceful shutdown hangs
     const forceTimer = setTimeout(() => {
       logger.error('Forced exit after shutdown timeout');
       process.exit(1);
-    }, 15_000);
+    }, 30_000);
     forceTimer.unref();
 
     try {
       server.close();
-      await stopBot();
+      // Close worker FIRST — waits for in-progress jobs to finish
+      // (they still need bot for sendMessage). Then stop bot.
       await closeWorker();
+      await stopBot();
       await closeQueue();
       stopCronJobs();
       await closeRedis();

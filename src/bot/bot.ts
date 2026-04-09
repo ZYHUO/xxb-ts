@@ -33,6 +33,11 @@ export function getBot(): Bot {
   return _bot;
 }
 
+/** Safe version that returns undefined instead of throwing (for shutdown-safe checks) */
+export function tryGetBot(): Bot | undefined {
+  return _bot;
+}
+
 export async function stopBot(): Promise<void> {
   if (_bot) {
     await _bot.stop();
