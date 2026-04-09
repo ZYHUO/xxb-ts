@@ -16,16 +16,14 @@ export function buildToolSet(chatId: number, userId: number) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {};
 
-  // SEARCH — SearxNG web search
-  if (e.SEARXNG_URL) {
-    tools.SEARCH = tool({
-      description: '搜索互联网获取最新信息。当用户询问你不确定的事实、新闻、或需要实时数据时使用。',
-      parameters: z.object({
-        query: z.string().describe('搜索查询关键词'),
-      }),
-      execute: async ({ query }) => executeSearch(query),
-    });
-  }
+  // SEARCH — web search (DuckDuckGo fallback, SearxNG if configured)
+  tools.SEARCH = tool({
+    description: '搜索互联网获取最新信息。当用户询问你不确定的事实、新闻、或需要实时数据时使用。',
+    parameters: z.object({
+      query: z.string().describe('搜索查询关键词'),
+    }),
+    execute: async ({ query }) => executeSearch(query),
+  });
 
   // FETCH — fetch a web page (always available via direct fetch)
   tools.FETCH = tool({
