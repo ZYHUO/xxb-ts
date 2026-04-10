@@ -31,11 +31,11 @@ export function validateInitData(initData: string, botToken: string): TelegramUs
     const hashBuf = Buffer.from(hash, 'hex');
     if (computedBuf.length !== hashBuf.length || !timingSafeEqual(computedBuf, hashBuf)) return null;
 
-    // Check auth_date freshness (5 min window)
+    // Check auth_date freshness (24h window — Telegram's recommended production limit)
     const authDate = params.get('auth_date');
     if (authDate) {
       const age = Math.floor(Date.now() / 1000) - parseInt(authDate, 10);
-      if (age > 300) return null;
+      if (age > 86400) return null;
     }
 
     // Parse user
