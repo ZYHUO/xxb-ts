@@ -66,7 +66,19 @@ async function main(): Promise<void> {
   // 9. Start bot (webhook or polling)
   if (config.WEBHOOK_URL) {
     const secretPath = config.WEBHOOK_SECRET ?? '';
-    await bot.api.setWebhook(`${config.WEBHOOK_URL}/${secretPath}`);
+    // Retry once on 429 (Telegram rate-limits setWebhook during rapid restarts)
+    try {
+      await bot.api.setWebhook(`${config.WEBHOOK_URL}/${secretPath}`);
+    } catch (err: unknown) {
+      const retryAfter =
+        err instanceof Error && 'parameters' in err
+          ? ((err as Record<string, unknown>).parameters as Record<string, number> | undefined)?.retry_after
+          : undefined;
+      const delay = ((retryAfter ?? 1) + 1) * 1000;
+      logger.warn({ delay }, 'setWebhook 429, retrying after delay');
+      await new Promise((r) => setTimeout(r, delay));
+      await bot.api.setWebhook(`${config.WEBHOOK_URL}/${secretPath}`);
+    }
     logger.info({ url: config.WEBHOOK_URL }, 'Webhook set');
   } else {
     // Polling mode
