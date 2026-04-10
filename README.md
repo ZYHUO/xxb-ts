@@ -145,6 +145,7 @@ scripts/                  # 迁移 + 部署脚本
 - Redis ≥ 7
 - Telegram Bot Token（从 [@BotFather](https://t.me/BotFather) 获取）
 - OpenAI 兼容 API 密钥（OpenAI / Google Gemini / Anthropic / 自建代理等）
+- ChromaDB（可选，用于长期语义记忆）
 
 #### 安装
 
@@ -223,6 +224,32 @@ PM2 仅建议作为备用手动方案保留；正式常驻运行优先使用 sys
 | `BOT_NICKNAMES` | Bot 昵称（逗号分隔） | `xxb,啾咪囝` |
 | `MASTER_UID` | 主人 Telegram UID | `0` |
 | `ALLOWLIST_ENABLED` | 启用群聊白名单 | `false` |
+| `CHROMA_HOST` | ChromaDB 地址 | `localhost` |
+| `CHROMA_PORT` | ChromaDB 端口 | `8000` |
+
+### 🧠 ChromaDB（长期语义记忆，可选）
+
+ChromaDB 用于存储消息的向量嵌入，实现跨时间的语义检索。**不配置也能正常运行**，只是语义记忆功能不可用。
+
+#### 安装
+
+```bash
+pip install chromadb
+```
+
+#### 启动
+
+```bash
+# 指定数据目录和端口，后台运行
+nohup chroma run --host 127.0.0.1 --port 8400 --path ./data/chroma > chroma.log 2>&1 &
+```
+
+#### 注意事项
+
+- **endpoint 只填到 `/v1`，不要包含 `/chat/completions`**，SDK 会自动拼接路径
+- `CHROMA_PORT` 必须与实际启动端口一致
+- 启动时务必用 `--path` 指定持久化目录，否则数据重启后丢失
+- 若该端口已被其他服务占用，换一个端口并同步修改 `.env` 中的 `CHROMA_PORT`
 
 ### 📊 Prompt 五层系统
 
