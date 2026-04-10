@@ -25,6 +25,12 @@ export interface FormattedMessage {
   imageFileId?: string;
   imageDescriptions?: string[];
   isBot?: boolean;
+  /** 匿名管理员（sender_chat 是群组）或频道发言（sender_chat 是频道） */
+  isAnonymous?: boolean;
+  /** 匿名身份类型 */
+  anonymousType?: 'admin' | 'channel';
+  /** Telegram custom tag (Bot API 9.5+, Premium feature) */
+  senderTag?: string;
 }
 
 export type JudgeAction = 'REPLY' | 'REPLY_PRO' | 'IGNORE' | 'REJECT';

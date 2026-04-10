@@ -21,6 +21,14 @@ const envSchema = z.object({
   AI_MODEL_VISION: z.string().default('gpt-4o'),
   AI_MODEL_SUMMARIZE: z.string().default('gpt-4o-mini'),
 
+  // Local AI provider (Qwen / GLM / etc. — OpenAI-compatible, no NSFW/political)
+  // Used for: judge, summarize, allowlist_review, knowledge-sync
+  LOCAL_AI_BASE_URL: z.string().url().optional(),
+  LOCAL_AI_API_KEY: z.string().optional(),
+  LOCAL_AI_MODEL_JUDGE: z.string().optional(),
+  LOCAL_AI_MODEL_SUMMARIZE: z.string().optional(),
+  LOCAL_AI_MODEL_ALLOWLIST: z.string().optional(),
+
   // Server
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
@@ -67,6 +75,38 @@ const envSchema = z.object({
     .transform((s) => s.split(',')),
   CONTEXT_MAX_LENGTH: z.coerce.number().int().positive().default(600),
   JUDGE_WINDOW_SIZE: z.coerce.number().int().positive().default(10),
+
+  // Knowledge base (file-backed, PHP parity)
+  KNOWLEDGE_BASE_DIR: z.string().default('./data/knowledge'),
+  JUDGE_KNOWLEDGE_ENABLED: z.coerce.boolean().default(false),
+  JUDGE_KNOWLEDGE_PERMANENT: z.coerce.boolean().default(true),
+  JUDGE_KNOWLEDGE_GROUP: z.coerce.boolean().default(true),
+
+  // Knowledge cron (cron_long_term.php parity)
+  KNOWLEDGE_CRON_CHAT_IDS: z
+    .string()
+    .default('')
+    .transform((s) => {
+      const t = s.trim();
+      if (!t) return [] as number[];
+      try {
+        const j = JSON.parse(t) as unknown;
+        if (Array.isArray(j)) {
+          return j.map((x) => Number(x)).filter((n) => !Number.isNaN(n) && n !== 0);
+        }
+      } catch {
+        /* fall through */
+      }
+      return t
+        .split(',')
+        .map((x) => Number(x.trim()))
+        .filter((n) => !Number.isNaN(n) && n !== 0);
+    }),
+  KNOWLEDGE_CRON_SCHEDULE: z.string().default('30 * * * *'),
+  KNOWLEDGE_CRON_HASH_PATH: z.string().optional(),
+
+  // Persona override directory (per-user {uid}.md / .txt)
+  PERSONA_DIR: z.string().optional(),
 
   // Allowlist
   ALLOWLIST_ENABLED: z.coerce.boolean().default(false),

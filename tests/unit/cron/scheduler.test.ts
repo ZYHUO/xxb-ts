@@ -9,12 +9,11 @@ const mockSchedule = vi.fn();
 const mockStop = vi.fn();
 
 vi.mock('node-cron', () => ({
-  default: {
-    schedule: (...args: unknown[]) => {
-      mockSchedule(...args);
-      return { stop: mockStop };
-    },
+  schedule: (...args: unknown[]) => {
+    mockSchedule(...args);
+    return { stop: mockStop };
   },
+  validate: () => true,
 }));
 
 // Mock cron job modules
@@ -26,6 +25,12 @@ vi.mock('../../../src/cron/model-check.js', () => ({
 }));
 vi.mock('../../../src/cron/cleanup.js', () => ({
   runCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../src/cron/knowledge-sync.js', () => ({
+  runKnowledgeSync: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../src/tracking/user-profile.js', () => ({
+  runUserProfileSync: vi.fn().mockResolvedValue(undefined),
 }));
 
 const { startCronJobs, stopCronJobs, isStarted } = await import(
@@ -47,8 +52,8 @@ describe('CronScheduler', () => {
   it('should register cron jobs on start', () => {
     startCronJobs();
 
-    // Should have registered 3 jobs: model-check, daily-report, cleanup
-    expect(mockSchedule).toHaveBeenCalledTimes(3);
+    // model-check, daily-report, cleanup, knowledge-sync, user-profile-sync
+    expect(mockSchedule).toHaveBeenCalledTimes(5);
     expect(isStarted()).toBe(true);
   });
 
@@ -56,14 +61,14 @@ describe('CronScheduler', () => {
     startCronJobs();
     startCronJobs(); // second call should be no-op
 
-    expect(mockSchedule).toHaveBeenCalledTimes(3);
+    expect(mockSchedule).toHaveBeenCalledTimes(5);
   });
 
   it('should stop all jobs on stopCronJobs', () => {
     startCronJobs();
     stopCronJobs();
 
-    expect(mockStop).toHaveBeenCalledTimes(3);
+    expect(mockStop).toHaveBeenCalledTimes(5);
     expect(isStarted()).toBe(false);
   });
 
@@ -76,6 +81,8 @@ describe('CronScheduler', () => {
     expect(schedules).toContain('*/5 * * * *');   // model check
     expect(schedules).toContain('55 15 * * *');   // daily report
     expect(schedules).toContain('0 */6 * * *');   // cleanup
+    expect(schedules).toContain('30 * * * *');    // knowledge-sync (default)
+    expect(schedules).toContain('7 * * * *');     // user-profile-sync
   });
 
   it('should not start jobs when CRON_ENABLED is false', () => {

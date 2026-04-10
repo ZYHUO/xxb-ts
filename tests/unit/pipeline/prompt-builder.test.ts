@@ -119,5 +119,19 @@ describe('Prompt Builder', () => {
       const messages = buildMessages('sys', 'ctx', captionMsg);
       expect(messages[1]!.content).toContain('A nice photo');
     });
+
+    it('marks anonymous senders but still treats them as replyable current messages', () => {
+      const anonMsg: FormattedMessage = {
+        ...latestMessage,
+        uid: -1001,
+        username: '',
+        fullName: 'Test Group',
+        isAnonymous: true,
+        anonymousType: 'admin',
+      };
+      const messages = buildMessages('sys', 'ctx', anonMsg);
+      expect(messages[1]!.content).toContain('发送者: Test Group[匿名管理员]');
+      expect(messages[1]!.content).toContain('[CURRENT_MESSAGE_TO_REPLY]');
+    });
   });
 });

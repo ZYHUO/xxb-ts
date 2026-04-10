@@ -45,7 +45,7 @@ export async function addMessage(chatId: number, message: FormattedMessage): Pro
   );
 
   // Track group member (skip bots and assistant messages)
-  if (message.uid && message.role === 'user' && !message.isBot) {
+  if (message.uid && message.role === 'user' && !message.isBot && !message.isAnonymous) {
     try {
       const memberKey = MEMBERS_PREFIX + chatId;
       const memberData = JSON.stringify({

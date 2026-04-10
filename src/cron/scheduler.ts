@@ -3,17 +3,20 @@
 // Replaces PHP crontab-based cron_handler.php
 // ────────────────────────────────────────
 
-import cron from 'node-cron';
+import { schedule, validate } from 'node-cron';
+import { env } from '../env.js';
 import { runDailyReport } from './report.js';
 import { runModelCheck } from './model-check.js';
 import { runCleanup, type CleanupDeps } from './cleanup.js';
+import { runKnowledgeSync } from './knowledge-sync.js';
+import { runUserProfileSync } from '../tracking/user-profile.js';
 import { logger } from '../shared/logger.js';
 
 export interface CronDeps {
   cleanupDeps?: CleanupDeps;
 }
 
-const tasks: cron.ScheduledTask[] = [];
+const tasks: ReturnType<typeof schedule>[] = [];
 let _started = false;
 let _deps: CronDeps = {};
 
@@ -29,18 +32,35 @@ export function startCronJobs(deps?: CronDeps): void {
   }
 
   // Model status check — every 5 minutes
-  tasks.push(cron.schedule('*/5 * * * *', () => {
+  tasks.push(schedule('*/5 * * * *', () => {
     void safeRun('model-check', runModelCheck);
   }));
 
   // Daily report — every day at 23:55 Beijing time (15:55 UTC)
-  tasks.push(cron.schedule('55 15 * * *', () => {
+  tasks.push(schedule('55 15 * * *', () => {
     void safeRun('daily-report', runDailyReport);
   }));
 
   // Cleanup — every 6 hours
-  tasks.push(cron.schedule('0 */6 * * *', () => {
+  tasks.push(schedule('0 */6 * * *', () => {
     void safeRun('cleanup', () => runCleanup(_deps.cleanupDeps));
+  }));
+
+  // Knowledge base sync — configurable (PHP cron_long_term.php); only runs when chat IDs set
+  const ks = env().KNOWLEDGE_CRON_SCHEDULE;
+  if (validate(ks)) {
+    tasks.push(
+      schedule(ks, () => {
+        void safeRun('knowledge-sync', runKnowledgeSync);
+      }),
+    );
+  } else {
+    logger.warn({ expr: ks }, 'Invalid KNOWLEDGE_CRON_SCHEDULE, knowledge-sync cron disabled');
+  }
+
+  // User profile sync — every hour, Qwen3.6+ summarizes pending messages per user
+  tasks.push(schedule('7 * * * *', () => {
+    void safeRun('user-profile-sync', runUserProfileSync);
   }));
 
   logger.info({ jobCount: tasks.length }, 'Cron jobs started');

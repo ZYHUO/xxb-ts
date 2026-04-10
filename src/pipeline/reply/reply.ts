@@ -7,12 +7,14 @@ import type { JudgeAction } from '../../shared/types.js';
 import { buildSystemPrompt, buildMessages } from './prompt-builder.js';
 import { slimContextForAI } from '../context/slim.js';
 import { compressContext } from '../context/compressor.js';
-import { getKnowledge } from '../../knowledge/manager.js';
+import { searchKnowledge } from '../../knowledge/manager.js';
 import { generateWithTools } from '../tools/executor.js';
 import { parseReplyResponse } from './parser.js';
 import { getRecent, getGroupMembers } from '../context/manager.js';
 import { doCheckin } from '../checkin.js';
 import { getBotTracker } from '../../tracking/interaction.js';
+import { getUserProfilePrompt } from '../../tracking/user-profile.js';
+import { getReflection } from '../../tracking/outcome.js';
 import { logger } from '../../shared/logger.js';
 
 const MAX_DUPLICATE_RETRIES = 1;
@@ -53,14 +55,16 @@ export async function generateReply(
   const replyAction = action === 'REPLY_PRO' ? 'REPLY_PRO' : 'REPLY';
 
   // 1. Build system prompt (5-layer)
-  const systemPrompt = buildSystemPrompt(action);
+  const systemPrompt = buildSystemPrompt(action, message.uid);
 
   // 2. Compress and format context
   const compressed = compressContext(retrievedContext.merged, message, botUid);
   const contextStr = slimContextForAI(compressed, message, botUid);
 
-  // 3. Load knowledge
-  const knowledge = getKnowledge(chatId) || undefined;
+  // 3. Load knowledge (keyword-scoped like PHP searchKnowledge; empty query → full KB)
+  const queryText = (message.textContent || message.captionContent || '').trim();
+  const kb = searchKnowledge(chatId, queryText, 5);
+  const knowledge = kb ? kb : undefined;
 
   // 3.5 Checkin data injection — minimal real data, AI creates the rest
   let checkinData: string | undefined;
@@ -114,8 +118,26 @@ export async function generateReply(
     }
   }
 
+  // 3.8 User profile prompt (from hourly Qwen3.6+ summary)
+  let userProfile: string | undefined;
+  if (!message.isBot && !message.isAnonymous) {
+    try {
+      userProfile = getUserProfilePrompt(chatId, message.uid) ?? undefined;
+    } catch (err) {
+      logger.debug({ err, chatId }, 'Failed to fetch user profile (non-critical)');
+    }
+  }
+
+  // 3.9 Self-reflection (judge pattern learning)
+  let selfReflection: string | undefined;
+  try {
+    selfReflection = getReflection(chatId) ?? undefined;
+  } catch (err) {
+    logger.debug({ err, chatId }, 'Failed to fetch self-reflection (non-critical)');
+  }
+
   // 4. Build messages array
-  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData, memberRoster, botKnowledge);
+  const messages = buildMessages(systemPrompt, contextStr, message, knowledge, checkinData, memberRoster, botKnowledge, userProfile, selfReflection);
 
   // 5. Call AI (with tool support via Vercel AI SDK)
   const usage = replyAction === 'REPLY_PRO' ? 'reply_pro' : 'reply';

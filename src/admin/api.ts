@@ -14,6 +14,7 @@ import * as modelStatus from './model-status.js';
 import * as botPermission from './bot-permission.js';
 import { checkHealth } from './health.js';
 import type { Env } from '../env.js';
+import * as stickerStore from '../knowledge/sticker/store.js';
 
 interface ApiDeps {
   redis: Redis;
@@ -37,6 +38,7 @@ async function handleBootstrap(
     return {
       ok: true,
       is_master: false,
+      managed_enabled: deps.config.enabled,
       user: { id: user.id, first_name: user.first_name, username: user.username },
       ...myData,
     };
@@ -78,6 +80,7 @@ async function handleBootstrap(
     manual_queue: manualQueue,
     model_routing: modelRouting,
     sticker_policy: stickerPolicy,
+    managed_enabled: deps.config.enabled,
     is_master: master,
     user: { id: user.id, first_name: user.first_name, username: user.username },
   };
@@ -334,6 +337,72 @@ async function handleStickerPolicySave(
   return { ok: true };
 }
 
+async function handleStickerKbList(): Promise<Record<string, unknown>> {
+  const raw = stickerStore.listStickerKbIndex();
+  const items: Array<Record<string, unknown>> = [];
+  for (const row of raw) {
+    const item: Record<string, unknown> = {
+      file_unique_id: row.file_unique_id,
+      latest_file_id: row.latest_file_id,
+      set_name: row.set_name,
+      emoji: row.emoji,
+      sticker_format: row.sticker_format,
+      usage_count: row.usage_count,
+      analysis_status: row.analysis_status,
+      asset_status: row.asset_status,
+    };
+    if (row.analysis_status === 'ready') {
+      const full = stickerStore.getItem(row.file_unique_id);
+      item['persona_fit'] = full?.personaFit ?? null;
+      item['emotion_tags'] = full?.emotionTags ?? [];
+      item['mood_map'] = full?.moodMap ?? {};
+    } else {
+      item['persona_fit'] = null;
+      item['emotion_tags'] = [];
+      item['mood_map'] = {};
+    }
+    items.push(item);
+  }
+  return { ok: true, items };
+}
+
+async function handleStickerKbUpdate(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const fuid = typeof body['file_unique_id'] === 'string' ? body['file_unique_id'].trim() : '';
+  if (
+    fuid === '' ||
+    fuid.length > 100 ||
+    !/^[a-zA-Z0-9_-]+$/.test(fuid)
+  ) {
+    return { ok: false, error: 'missing_file_unique_id' };
+  }
+
+  if (!stickerStore.getItem(fuid)) {
+    return { ok: false, error: 'sticker_not_found' };
+  }
+
+  if (body['requeue']) {
+    const ok = stickerStore.requeueStickerAnalysis(fuid);
+    if (!ok) {
+      return { ok: false, error: 'sticker_not_found' };
+    }
+    return { ok: true, action: 'requeued' };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'persona_fit')) {
+    const raw = body['persona_fit'];
+    const newFit = raw === null ? null : Boolean(raw);
+    const ok = stickerStore.setStickerPersonaFit(fuid, newFit);
+    if (!ok) {
+      return { ok: false, error: 'sticker_not_found' };
+    }
+    return { ok: true, action: 'persona_fit_updated', persona_fit: newFit };
+  }
+
+  return { ok: false, error: 'no_action_specified' };
+}
+
 // ── Create Hono API ────────────────────────────────────────────────
 
 export function createAdminApi(deps: ApiDeps): Hono {
@@ -435,6 +504,21 @@ export function createAdminApi(deps: ApiDeps): Hono {
         case 'sticker_policy_save':
           if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
           return c.json(await handleStickerPolicySave(deps, body));
+        case 'sticker_kb_list':
+          if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
+          return c.json(await handleStickerKbList());
+        case 'sticker_kb_update': {
+          if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
+          const skRes = await handleStickerKbUpdate(body);
+          if (!skRes.ok) {
+            const err = String(skRes['error'] ?? '');
+            if (err === 'sticker_not_found') return c.json(skRes, 404);
+            if (err === 'missing_file_unique_id' || err === 'no_action_specified') {
+              return c.json(skRes, 400);
+            }
+          }
+          return c.json(skRes);
+        }
         default:
           return c.json({ ok: false, error: 'unknown_action' }, 400);
       }

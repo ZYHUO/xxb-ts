@@ -10,12 +10,18 @@ import { describeImage } from './vision.js';
 import { retrieveContext } from './context/retriever.js';
 import { generateReply } from './reply/reply.js';
 import { StreamingSender } from '../bot/sender/streaming.js';
-import { sendChatAction } from '../bot/sender/telegram.js';
+import { sendChatAction, sendSticker } from '../bot/sender/telegram.js';
 import { getBotUid } from '../bot/bot.js';
 import { recordMessage as recordActivity } from '../tracking/activity.js';
 import { getBotTracker } from '../tracking/interaction.js';
 import { tryGenerateDigest } from '../tracking/bot-digest.js';
-import { recordReply, checkOutcome } from '../tracking/outcome.js';
+import { recordReply, checkOutcome, generateReflection } from '../tracking/outcome.js';
+import { recordUserMessage } from '../tracking/user-profile.js';
+import { memorizeMessage } from '../memory/chroma.js';
+import { getReadyStickersByIntent } from '../knowledge/sticker/store.js';
+import { loadOverride } from '../admin/runtime-config.js';
+import { getRedis } from '../db/redis.js';
+import { callWithFallback } from '../ai/fallback.js';
 import { env } from '../env.js';
 import { logger } from '../shared/logger.js';
 
@@ -53,6 +59,11 @@ export async function processPipeline(job: ChatJob): Promise<void> {
   await addMessage(job.chatId, formatted);
   timings['save'] = Math.round(performance.now() - t2);
 
+  // 3.1 Long-term memory write (fire-and-forget, non-blocking)
+  memorizeMessage(job.chatId, formatted).catch((err) => {
+    logger.debug({ err, chatId: job.chatId }, 'Memory write failed (non-critical)');
+  });
+
   const e = env();
 
   // 3.5 Record group activity
@@ -81,11 +92,46 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     });
   }
 
-  // 3.7 Check reply outcomes
+  // 3.7 Check reply outcomes + trigger self-reflection
   if (e.OUTCOME_TRACKING_ENABLED) {
-    checkOutcome(job.chatId, formatted, e.BOT_USERNAME).catch((err) => {
+    checkOutcome(job.chatId, formatted, e.BOT_USERNAME).then(({ needsReflection }) => {
+      if (needsReflection) {
+        generateReflection(job.chatId, async (prompt) => {
+          try {
+            const result = await callWithFallback({
+              usage: 'summarize',
+              messages: [{ role: 'user', content: prompt }],
+              maxTokens: 300,
+              temperature: 0.3,
+            });
+            return result.content;
+          } catch (err) {
+            logger.warn({ err, chatId: job.chatId }, 'Reflection AI call failed');
+            return null;
+          }
+        }).catch((err) => {
+          logger.debug({ err, chatId: job.chatId }, 'generateReflection failed (non-critical)');
+        });
+      }
+    }).catch((err) => {
       logger.debug({ err, chatId: job.chatId }, 'Outcome check failed (non-critical)');
     });
+  }
+
+  // 3.8 Record user message for profile (fire-and-forget, humans only)
+  if (!formatted.isBot && !formatted.isAnonymous && formatted.textContent.trim()) {
+    try {
+      recordUserMessage(
+        job.chatId,
+        formatted.uid,
+        formatted.username,
+        formatted.fullName,
+        formatted.senderTag,
+        formatted.textContent,
+      );
+    } catch (err) {
+      logger.debug({ err, chatId: job.chatId }, 'User profile record failed (non-critical)');
+    }
   }
 
   // 4. Judge (L0 → L1 → L2)
@@ -157,14 +203,46 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     const t6 = performance.now();
     const sentMessages: Array<{ messageId: number; text: string }> = [];
 
+    // Load sticker policy once
+    const override = await loadOverride(getRedis()).catch(() => null);
+    const stickerPolicy = {
+      enabled: override?.sticker_policy?.enabled ?? true,
+      mode: override?.sticker_policy?.mode ?? 'ai',
+      sendPosition: override?.sticker_policy?.send_position ?? 'after',
+    };
+
     for (const reply of replies) {
       try {
+        // Resolve sticker before sending if position is 'before'
+        let stickerFileId: string | undefined;
+        if (stickerPolicy.enabled && stickerPolicy.mode !== 'off' && reply.stickerIntent) {
+          const candidates = getReadyStickersByIntent(reply.stickerIntent);
+          if (candidates.length > 0) {
+            candidates.sort((a, b) => b.score - a.score);
+            // Pick randomly among top-3 to add variety
+            const pool = candidates.slice(0, 3);
+            stickerFileId = pool[Math.floor(Math.random() * pool.length)]!.fileId;
+          }
+        }
+
+        if (stickerFileId && stickerPolicy.sendPosition === 'before') {
+          await sendSticker(job.chatId, stickerFileId).catch((err) => {
+            logger.warn({ err, chatId: job.chatId }, 'Sticker send (before) failed, continuing');
+          });
+        }
+
         const sent = await sender.sendDirect(
           job.chatId,
           reply.replyContent,
           reply.targetMessageId,
         );
         sentMessages.push({ messageId: sent.messageId, text: reply.replyContent });
+
+        if (stickerFileId && stickerPolicy.sendPosition === 'after') {
+          await sendSticker(job.chatId, stickerFileId).catch((err) => {
+            logger.warn({ err, chatId: job.chatId }, 'Sticker send (after) failed, continuing');
+          });
+        }
       } catch (err) {
         logger.error({ chatId: job.chatId, targetMessageId: reply.targetMessageId, err },
           'Failed to send reply in multi-reply sequence');

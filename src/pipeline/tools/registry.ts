@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { tool } from 'ai';
+import type { Tool } from 'ai';
 import { executeSearch } from './search.js';
 import { executeFetch } from './web-fetch.js';
 import { executeIpQuality } from './ip-quality.js';
@@ -13,8 +14,7 @@ import { env } from '../../env.js';
 
 export function buildToolSet(chatId: number, userId: number) {
   const e = env();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tools: Record<string, any> = {};
+  const tools: Record<string, Tool> = {};
 
   // SEARCH — web search (DuckDuckGo fallback, SearxNG if configured)
   tools.SEARCH = tool({

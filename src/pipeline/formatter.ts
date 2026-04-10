@@ -29,9 +29,18 @@ interface TgSticker {
   is_video?: boolean;
 }
 
+interface TgChat {
+  id: number;
+  type: string;
+  title?: string;
+  username?: string;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
+  sender_chat?: TgChat;
+  sender_tag?: string;
   date: number;
   chat: { id: number; type: string };
   text?: string;
@@ -81,24 +90,52 @@ function getLargestPhoto(photos: TgPhotoSize[]): string | undefined {
 }
 
 export function formatMessage(update: Record<string, unknown>): FormattedMessage | null {
-  const msg = (update['message'] ?? update['edited_message']) as TgMessage | undefined;
+  const msg = (
+    update['message'] ??
+    update['edited_message'] ??
+    update['channel_post'] ??
+    update['edited_channel_post']
+  ) as TgMessage | undefined;
   if (!msg) return null;
 
   const from = msg.from;
-  if (!from) return null;
+  const senderChat = msg.sender_chat;
+
+  // 必须有发送者（普通用户 或 sender_chat，匿名管理员/频道）
+  if (!from && !senderChat) return null;
 
   const isForwarded = !!(msg.forward_from ?? msg.forward_sender_name ?? msg.forward_from_chat ?? msg.forward_date);
 
+  // 匿名管理员：from 是 GroupAnonymousBot (id: 1087968824)，sender_chat 是真实群
+  // 频道消息：from 为空，sender_chat 是频道
+  const isAnonymousAdmin = from?.id === 1087968824;
+  const effectiveSenderChat = (isAnonymousAdmin || !from) ? senderChat : undefined;
+
+  const uid = effectiveSenderChat ? effectiveSenderChat.id : from!.id;
+  const username = effectiveSenderChat
+    ? (effectiveSenderChat.username ?? '')
+    : (from!.username ?? '');
+  const fullName = effectiveSenderChat
+    ? (effectiveSenderChat.title ?? effectiveSenderChat.username ?? 'Channel')
+    : buildFullName(from!);
+  const isBot = effectiveSenderChat ? false : (from!.is_bot ?? false);
+  const isAnonymous = !!effectiveSenderChat;
+  const anonymousType = effectiveSenderChat
+    ? (isAnonymousAdmin ? 'admin' : 'channel')
+    : undefined;
+
   const formatted: FormattedMessage = {
     role: 'user',
-    uid: from.id,
-    username: from.username ?? '',
-    fullName: buildFullName(from),
+    uid,
+    username,
+    fullName,
     timestamp: msg.date,
     messageId: msg.message_id,
     textContent: msg.text ?? '',
     isForwarded,
-    isBot: from.is_bot ?? false,
+    isBot,
+    ...(isAnonymous && { isAnonymous, anonymousType }),
+    ...(msg.sender_tag && { senderTag: msg.sender_tag }),
   };
 
   if (msg.caption) {

@@ -35,8 +35,16 @@ export async function callModel(
 
     const latencyMs = Math.round(performance.now() - start);
 
+    // Strip <think>...</think> blocks (Qwen3/DeepSeek-R1 reasoning traces)
+    // Some models emit these even when not asked; remove before passing to parsers
+    const rawText = result.text;
+    const text = rawText
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .trim();
+
     return {
-      content: result.text,
+      content: text,
       tokenUsage: {
         prompt: result.usage?.promptTokens ?? 0,
         completion: result.usage?.completionTokens ?? 0,

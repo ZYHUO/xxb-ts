@@ -27,6 +27,10 @@ function formatNameTag(msg: FormattedMessage, botUid: number): string {
   if (msg.role === 'assistant' || msg.uid === botUid) {
     return `${name}(bot)`;
   }
+  if (msg.isAnonymous) {
+    const label = msg.anonymousType === 'channel' ? '频道' : '匿名管理员';
+    return `${name}[${label}]`;
+  }
   if (msg.isBot) {
     return msg.username ? `${name}[BOT](@${msg.username})` : `${name}[BOT]`;
   }

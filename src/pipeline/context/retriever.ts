@@ -11,6 +11,7 @@ import type { FormattedMessage, RetrievedContext } from '../../shared/types.js';
 import { getRecent, getAll } from './manager.js';
 import { countTokens } from '../../ai/token-counter.js';
 import { slimContextForAI } from './slim.js';
+import { searchMemory } from '../../memory/chroma.js';
 import { logger } from '../../shared/logger.js';
 
 export interface RetrieverConfig {
@@ -37,15 +38,15 @@ async function retrieveRecent(chatId: number, count: number): Promise<FormattedM
 }
 
 /**
- * Path 2: Semantic search — STUB for Phase 2.
- * Full implementation requires sqlite-vec embeddings (Phase 3).
+ * Path 2: Semantic search — long-term memory via ChromaDB.
+ * Hard 500ms timeout, returns [] on failure or timeout.
  */
 async function retrieveSemantic(
-  _chatId: number,
-  _query: string,
-  _topK: number,
+  chatId: number,
+  query: string,
+  topK: number,
 ): Promise<FormattedMessage[]> {
-  return [];
+  return searchMemory(chatId, query, topK, 500);
 }
 
 /**
@@ -170,10 +171,14 @@ export async function retrieveContext(
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const queryText = message.textContent || message.captionContent || '';
 
-  // Run all 4 paths in parallel
-  const [recent, semantic, thread, entity] = await Promise.all([
-    retrieveRecent(chatId, cfg.recentWindow),
-    retrieveSemantic(chatId, queryText, cfg.semanticTopK),
+  // Run recent first; if it already fills the token budget, skip the expensive semantic fetch
+  const recent = await retrieveRecent(chatId, cfg.recentWindow);
+  const recentContextStr = slimContextForAI(recent, message, botUid);
+  const skipSemantic = countTokens(recentContextStr) >= cfg.totalTokenBudget;
+
+  // Thread and entity are cheap local SQLite reads — always run in parallel
+  const [semantic, thread, entity] = await Promise.all([
+    skipSemantic ? Promise.resolve([] as FormattedMessage[]) : retrieveSemantic(chatId, queryText, cfg.semanticTopK),
     retrieveThread(chatId, message, cfg.threadMaxDepth),
     retrieveEntity(chatId, message, cfg.entityMaxMessages),
   ]);

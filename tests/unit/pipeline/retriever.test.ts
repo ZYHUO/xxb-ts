@@ -4,6 +4,9 @@ import type { FormattedMessage } from '../../../src/shared/types.js';
 // Mock the context manager and token counter
 const mockGetRecent = vi.fn<(chatId: number, count: number) => Promise<FormattedMessage[]>>();
 const mockGetAll = vi.fn<(chatId: number) => Promise<FormattedMessage[]>>();
+const mockSearchMemory = vi.fn<
+  (chatId: number, query: string, topK: number, timeoutMs: number) => Promise<FormattedMessage[]>
+>();
 
 vi.mock('../../../src/pipeline/context/manager.js', () => ({
   getRecent: (...args: Parameters<typeof mockGetRecent>) => mockGetRecent(...args),
@@ -12,6 +15,12 @@ vi.mock('../../../src/pipeline/context/manager.js', () => ({
 
 vi.mock('../../../src/ai/token-counter.js', () => ({
   countTokens: (text: string) => Math.ceil(text.length / 4),
+}));
+
+vi.mock('../../../src/memory/chroma.js', () => ({
+  searchMemory: (
+    ...args: Parameters<typeof mockSearchMemory>
+  ) => mockSearchMemory(...args),
 }));
 
 import { retrieveContext } from '../../../src/pipeline/context/retriever.js';
@@ -35,6 +44,7 @@ describe('Context Retriever', () => {
     vi.clearAllMocks();
     mockGetRecent.mockResolvedValue([]);
     mockGetAll.mockResolvedValue([]);
+    mockSearchMemory.mockResolvedValue([]);
   });
 
   it('returns recent window messages', async () => {
@@ -54,6 +64,53 @@ describe('Context Retriever', () => {
     mockGetRecent.mockResolvedValue([]);
     const result = await retrieveContext(1, makeMsg(), 9999);
     expect(result.semantic).toHaveLength(0);
+  });
+
+  it('runs semantic retrieval when recent window is full but still within token budget', async () => {
+    const recent = Array.from({ length: 20 }, (_, i) =>
+      makeMsg({
+        messageId: i + 1,
+        timestamp: 1700000000 + i,
+        textContent: 'hi',
+      }),
+    );
+    const semanticHit = makeMsg({
+      messageId: 501,
+      timestamp: 1700001000,
+      textContent: 'semantic hit',
+    });
+    mockGetRecent.mockResolvedValue(recent);
+    mockSearchMemory.mockResolvedValue([semanticHit]);
+
+    const result = await retrieveContext(
+      1,
+      makeMsg({ messageId: 999, textContent: 'query' }),
+      9999,
+      { totalTokenBudget: 1500 },
+    );
+
+    expect(mockSearchMemory).toHaveBeenCalledWith(1, 'query', 10, 500);
+    expect(result.semantic).toEqual([semanticHit]);
+  });
+
+  it('skips semantic retrieval when recent context alone exceeds token budget', async () => {
+    const recent = Array.from({ length: 6 }, (_, i) =>
+      makeMsg({
+        messageId: i + 1,
+        timestamp: 1700000000 + i,
+        textContent: 'This is a long recent message that should exceed the small token budget.',
+      }),
+    );
+    mockGetRecent.mockResolvedValue(recent);
+
+    await retrieveContext(
+      1,
+      makeMsg({ messageId: 1000, textContent: 'query' }),
+      9999,
+      { totalTokenBudget: 40 },
+    );
+
+    expect(mockSearchMemory).not.toHaveBeenCalled();
   });
 
   it('follows reply_to chain for thread trace', async () => {

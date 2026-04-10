@@ -90,14 +90,22 @@ describe('buildModelRoutingAdminView', () => {
       allowlist_review: 'gpt-4o-mini',
     });
     expect(view.has_override).toBe(true);
-    expect(view.providers).toEqual(override.providers);
+    expect((view.providers as Record<string, { model: string }>)['p1']).toEqual({
+      endpoint: 'https://a.com/v1',
+      model: 'm1',
+    });
+    expect((view.providers as Record<string, { model: string }>)['reply']!.model).toBeTruthy();
+    expect(view.effective).toEqual({
+      reply: { label: 'p1', backups: ['reply_pro'], timeout: 60_000 },
+      allowlist_review: { label: 'allowlist_review', backups: ['reply'], timeout: 60_000 },
+    });
   });
 
   it('returns has_override=false when no override', () => {
     const view = buildModelRoutingAdminView(envConfig, null);
     expect(view.has_override).toBe(false);
     expect(view.override).toBeNull();
-    expect(view.providers).toEqual({});
+    expect((view.providers as Record<string, { model: string }>)['reply']!.model).toBeTruthy();
   });
 });
 

@@ -2,17 +2,18 @@
 // Fallback chain + hedged request
 // ────────────────────────────────────────
 
-import type { AICallOptions, AICallResult } from './types.js';
-import { getLabel, getUsage } from './labels.js';
+import type { AICallOptions, AICallResult, AILabel } from './types.js';
 import { callModel } from './provider.js';
 import { CooldownTracker } from './cooldown.js';
 import { AIError } from '../shared/errors.js';
 import { logger } from '../shared/logger.js';
 import { getRedis } from '../db/redis.js';
+import { loadOverride, resolveLabelForRuntime, resolveUsageForRuntime } from '../admin/runtime-config.js';
 import { env } from '../env.js';
 
 export async function callWithFallback(options: AICallOptions): Promise<AICallResult> {
-  const usage = getUsage(options.usage);
+  const override = await loadOverride(getRedis()).catch(() => null);
+  const usage = resolveUsageForRuntime(options.usage, override);
   const labelNames = [usage.label, ...usage.backups];
   const cooldown = new CooldownTracker(getRedis());
   const hedgeDelayMs = env().HEDGE_DELAY_MS;
@@ -32,7 +33,7 @@ export async function callWithFallback(options: AICallOptions): Promise<AICallRe
     // Skip label already tried as a hedge
     if (labelName === hedgeTriedLabel) continue;
 
-    const label = getLabel(labelName);
+    const label = resolveLabelForRuntime(labelName, override);
 
     // Skip if cooling down
     if (await cooldown.isCoolingDown(label.model)) {
@@ -45,7 +46,7 @@ export async function callWithFallback(options: AICallOptions): Promise<AICallRe
       // race with a delayed backup call
       if (i === 0 && labelNames.length > 1 && hedgeDelayMs > 0) {
         hedgeTriedLabel = labelNames[1]!;
-        const result = await hedgedCall(label, labelNames[1]!, options.messages, callOpts, hedgeDelayMs, cooldown);
+        const result = await hedgedCall(label, labelNames[1]!, options.messages, callOpts, hedgeDelayMs, cooldown, override);
         return result;
       }
 
@@ -67,20 +68,22 @@ export async function callWithFallback(options: AICallOptions): Promise<AICallRe
 }
 
 async function hedgedCall(
-  primaryLabel: ReturnType<typeof getLabel>,
+  primaryLabel: AILabel,
   hedgeLabelName: string,
   messages: AICallOptions['messages'],
   callOpts: { maxTokens?: number; temperature?: number; timeout?: number },
   hedgeDelayMs: number,
   cooldown: CooldownTracker,
+  override: Awaited<ReturnType<typeof loadOverride>>,
 ): Promise<AICallResult> {
-  const hedgeLabel = getLabel(hedgeLabelName);
+  const hedgeLabel = resolveLabelForRuntime(hedgeLabelName, override);
 
   return new Promise<AICallResult>((resolve, reject) => {
     let settled = false;
     let primaryDone = false;
     let hedgeDone = false;
     let primaryError: Error | undefined;
+    let hedgeError: Error | undefined;
     let hedgeStarted = false;
 
     const tryReject = () => {
@@ -88,7 +91,7 @@ async function hedgedCall(
       if (!settled && primaryDone && (hedgeDone || !hedgeStarted)) {
         settled = true;
         clearTimeout(hedgeTimer);
-        reject(primaryError ?? new AIError('Hedged call failed', 'unknown', 'unknown', 'AI_HEDGE_FAILED'));
+        reject(primaryError ?? hedgeError ?? new AIError('Hedged call failed', 'unknown', 'unknown', 'AI_HEDGE_FAILED'));
       }
     };
 
@@ -123,7 +126,8 @@ async function hedgedCall(
               resolve(result);
             }
           })
-          .catch(() => {
+          .catch((err: unknown) => {
+            hedgeError = err instanceof Error ? err : new Error(String(err));
             hedgeDone = true;
             tryReject();
           });

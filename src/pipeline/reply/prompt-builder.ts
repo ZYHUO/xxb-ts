@@ -8,6 +8,8 @@
 // L5: Task (reply.md or reply-pro.md)
 // ────────────────────────────────────────
 
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { FormattedMessage, JudgeAction } from '../../shared/types.js';
 import { loadPrompt, getConfig } from '../../shared/config.js';
 
@@ -30,13 +32,39 @@ function loadCachedPrompt(relativePath: string): string {
   const config = getConfig();
   const content = loadPrompt(relativePath, config.promptsDir);
   cache.set(relativePath, content);
+  // Cap cache at 200 entries (evict oldest — first in insertion order)
+  if (cache.size > 200) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
   return content;
+}
+
+function loadPersonaForUser(userId: number | undefined): string {
+  if (!userId) {
+    return loadCachedPrompt('identity/persona.md');
+  }
+  const { personaDir } = getConfig();
+  const md = resolve(personaDir, `${userId}.md`);
+  const txt = resolve(personaDir, `${userId}.txt`);
+  try {
+    if (existsSync(md)) {
+      return readFileSync(md, 'utf-8').trim();
+    }
+    if (existsSync(txt)) {
+      return readFileSync(txt, 'utf-8').trim();
+    }
+  } catch {
+    /* fall through */
+  }
+  return loadCachedPrompt('identity/persona.md');
 }
 
 /**
  * Build the 5-layer system prompt.
+ * @param userId — optional; loads prompts/persona/{userId}.md|.txt when present (PHP PersonaManager parity).
  */
-export function buildSystemPrompt(action: JudgeAction): string {
+export function buildSystemPrompt(action: JudgeAction, userId?: number): string {
   const layers: string[] = [];
 
   // L0: Runtime context (current time)
@@ -45,7 +73,7 @@ export function buildSystemPrompt(action: JudgeAction): string {
   layers.push(`# 当前时间\n\n${timeStr}（北京时间）`);
 
   // L1: Identity
-  layers.push(loadCachedPrompt('identity/persona.md'));
+  layers.push(loadPersonaForUser(userId));
 
   // L2: Safety
   layers.push(loadCachedPrompt('safety/guardrails.md'));
@@ -66,6 +94,15 @@ export function buildSystemPrompt(action: JudgeAction): string {
 }
 
 /**
+ * Strip ASCII control characters (except newline) and truncate to maxLen.
+ * Used to sanitize user-controlled strings injected into prompts.
+ */
+function sanitizeSenderString(s: string, maxLen = 64): string {
+  // Remove control chars \x00-\x1f except \n (0x0a)
+  return s.replace(/[\x00-\x09\x0b-\x1f]/g, '').slice(0, maxLen);
+}
+
+/**
  * Build the messages array for AI call.
  */
 export function buildMessages(
@@ -76,6 +113,8 @@ export function buildMessages(
   checkinData?: string,
   memberRoster?: string,
   botKnowledge?: string,
+  userProfile?: string,
+  selfReflection?: string,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const userParts: string[] = [];
 
@@ -95,10 +134,28 @@ export function buildMessages(
     userParts.push(`[群组Bot知识]\n${botKnowledge}`);
   }
 
+  if (selfReflection) {
+    userParts.push(`[自我反思·回复规律]\n${selfReflection}`);
+  }
+
   userParts.push(`[群聊上下文]\n${context}`);
 
   const msgText = latestMessage.textContent || latestMessage.captionContent || '[空消息]';
-  userParts.push(`[CURRENT_MESSAGE_TO_REPLY]\nmessage_id: ${latestMessage.messageId}\n发送者: ${latestMessage.fullName}(@${latestMessage.username})\n内容: ${msgText}`);
+  const safeName = sanitizeSenderString(latestMessage.fullName ?? '');
+  const safeUser = sanitizeSenderString(latestMessage.username ?? '');
+  const senderLabel = latestMessage.isAnonymous
+    ? `${safeName}[${latestMessage.anonymousType === 'channel' ? '频道' : '匿名管理员'}]`
+    : `${safeName}(@${safeUser})`;
+
+  let currentMsgBlock = `[CURRENT_MESSAGE_TO_REPLY]\nmessage_id: ${latestMessage.messageId}\n发送者: ${senderLabel}`;
+  if (latestMessage.senderTag) {
+    currentMsgBlock += `\n用户Tag: ${latestMessage.senderTag}`;
+  }
+  if (userProfile) {
+    currentMsgBlock += `\n用户画像: ${userProfile}`;
+  }
+  currentMsgBlock += `\n内容: ${msgText}`;
+  userParts.push(currentMsgBlock);
 
   return [
     { role: 'system' as const, content: systemPrompt },

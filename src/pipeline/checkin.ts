@@ -54,6 +54,7 @@ export function doCheckin(
   const today = getTodayDate();
   const yesterday = getYesterdayDate();
 
+  return db.transaction(() => {
   // Check if already checked in today
   const existing = db.prepare(
     'SELECT streak, total_checkins, reward_coins, reward_exp, lucky_number, fortune FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?',
@@ -109,11 +110,38 @@ export function doCheckin(
   const luckyNumber = Math.floor(Math.random() * 100) + 1;
   const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)]!;
 
-  // Insert
-  db.prepare(`
-    INSERT INTO checkins (chat_id, uid, username, full_name, checkin_date, streak, total_checkins, reward_coins, reward_exp, lucky_number, fortune)
+  // INSERT OR IGNORE: if a concurrent call already inserted, this is a no-op
+  const result = db.prepare(`
+    INSERT OR IGNORE INTO checkins (chat_id, uid, username, full_name, checkin_date, streak, total_checkins, reward_coins, reward_exp, lucky_number, fortune)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(chatId, uid, username, fullName, today, streak, totalCheckins, rewardCoins, rewardExp, luckyNumber, fortune);
+
+  if (result.changes === 0) {
+    // Another concurrent call inserted first — return their data
+    const existing2 = db.prepare(
+      'SELECT streak, total_checkins, reward_coins, reward_exp, lucky_number, fortune FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?',
+    ).get(chatId, uid, today) as {
+      streak: number; total_checkins: number; reward_coins: number;
+      reward_exp: number; lucky_number: number; fortune: string;
+    };
+    const rank2 = (db.prepare(
+      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ? AND id <= (SELECT id FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?)',
+    ).get(chatId, today, chatId, uid, today) as { cnt: number }).cnt;
+    const todayTotal2 = (db.prepare(
+      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ?',
+    ).get(chatId, today) as { cnt: number }).cnt;
+    return {
+      isNew: false,
+      streak: existing2.streak,
+      totalCheckins: existing2.total_checkins,
+      rewardCoins: existing2.reward_coins,
+      rewardExp: existing2.reward_exp,
+      luckyNumber: existing2.lucky_number,
+      fortune: existing2.fortune,
+      rank: rank2,
+      todayCheckins: todayTotal2,
+    };
+  }
 
   // Get rank
   const rank = (db.prepare(
@@ -131,4 +159,5 @@ export function doCheckin(
     rank,
     todayCheckins: rank,
   };
+  })();
 }

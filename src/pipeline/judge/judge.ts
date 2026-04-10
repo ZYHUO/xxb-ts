@@ -7,6 +7,8 @@ import type { RuleContext } from './rules.js';
 import { evaluateRules } from './rules.js';
 import { microJudge } from './micro.js';
 import { logger } from '../../shared/logger.js';
+import { env } from '../../env.js';
+import { getKnowledge } from '../../knowledge/manager.js';
 
 export interface JudgeInput {
   message: FormattedMessage;
@@ -44,22 +46,43 @@ export async function judge(input: JudgeInput): Promise<JudgeResult> {
   };
 
   const l0Start = performance.now();
-  const l0Result = evaluateRules(ruleCtx);
+   const l0Result = evaluateRules(ruleCtx);
   if (l0Result) {
     l0Result.latencyMs = Math.round(performance.now() - l0Start);
     logger.debug({ rule: l0Result.rule, action: l0Result.action, ms: l0Result.latencyMs }, 'L0 rule matched');
     return l0Result;
   }
 
+  const e = env();
+  let knowledgeForJudge = '';
+  if (e.JUDGE_KNOWLEDGE_ENABLED) {
+    knowledgeForJudge = getKnowledge(input.chatId, {
+      permanent: e.JUDGE_KNOWLEDGE_PERMANENT,
+      group: e.JUDGE_KNOWLEDGE_GROUP,
+    });
+  }
+
   // ── L1: Micro model (150-300ms) ──
-  const l1Result = await microJudge(input.message, input.recentMessages, input.botUid, 'judge');
+  const l1Result = await microJudge(
+    input.message,
+    input.recentMessages,
+    input.botUid,
+    'judge',
+    knowledgeForJudge,
+  );
   if (l1Result.confidence !== undefined && l1Result.confidence > 0.8) {
     logger.debug({ action: l1Result.action, confidence: l1Result.confidence, ms: l1Result.latencyMs }, 'L1 high confidence');
     return l1Result;
   }
 
   // ── L2: Same as L1 but with M2_FAST and full context (Phase 1 simplified) ──
-  const l2Result = await microJudge(input.message, input.recentMessages, input.botUid, 'reply');
+  const l2Result = await microJudge(
+    input.message,
+    input.recentMessages,
+    input.botUid,
+    'reply',
+    knowledgeForJudge,
+  );
   l2Result.level = 'L2_AI';
 
   const totalMs = Math.round(performance.now() - totalStart);

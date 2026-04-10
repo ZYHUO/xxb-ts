@@ -59,11 +59,16 @@ export async function microJudge(
   recentMessages: FormattedMessage[],
   botUid: number,
   usage = 'judge',
+  knowledgeBase?: string,
 ): Promise<JudgeResult> {
   const start = performance.now();
   const config = getConfig();
   const systemPrompt = loadPrompt('task/judge.md', config.promptsDir);
   const contextStr = slimContextForAI(recentMessages, message, botUid);
+  const kbBlock =
+    knowledgeBase && knowledgeBase.trim()
+      ? `[知识库]\n${knowledgeBase.trim()}\n\n`
+      : '';
 
   let result: AICallResult;
   try {
@@ -71,7 +76,10 @@ export async function microJudge(
       usage,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `群聊上下文:\n${contextStr}\n\n请对最新一条消息(★标记)做出决策。` },
+        {
+          role: 'user',
+          content: `${kbBlock}群聊上下文:\n${contextStr}\n\n请对最新一条消息(★标记)做出决策。`,
+        },
       ],
       maxTokens: 100,
       temperature: 0,
@@ -91,7 +99,7 @@ export async function microJudge(
   const latencyMs = Math.round(performance.now() - start);
 
   if (!parsed) {
-    logger.warn({ raw: result.content }, 'Failed to parse judge response, defaulting to IGNORE');
+    logger.warn({ raw: result.content, parseFailure: true }, 'Failed to parse judge response, defaulting to IGNORE');
     return {
       action: 'IGNORE',
       level: 'L1_MICRO',

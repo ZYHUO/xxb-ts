@@ -149,12 +149,18 @@ scripts/                  # 迁移 + 部署脚本
 #### 安装
 
 ```bash
-git clone https://github.com/zhongyang001-tech/xxb-ts.git
+git clone https://github.com/ZYHUO/xxb-ts.git
 cd xxb-ts
 npm install
 cp .env.example .env
 # 编辑 .env，填入你的 Bot Token 和 AI API 配置
 ```
+
+#### 从 PHP 版 (xxb) 迁移数据
+
+- **群组知识库**：将 PHP `paths.knowledge_base` 目录下各 `{chatId}.md` 复制到本项目的 `KNOWLEDGE_BASE_DIR`（默认 `./data/knowledge`）。全局永久知识仍使用 `prompts/knowledge/permanent.md`（与 PHP 的 `permanent_knowledge.md` 可手工合并或择一维护）。
+- **双写禁忌**：若 TS 与 PHP 暂时共用同一知识库目录，只应在一侧启用 **定时知识库同步**（`KNOWLEDGE_CRON_CHAT_IDS` + cron）；避免两侧同时跑 `cron_long_term` 与本项目的 `knowledge-sync`。
+- **人设**：可选将 PHP `persona_path/{userId}.txt` 复制为 `prompts/persona/{userId}.txt` 或 `.md`（或通过 `PERSONA_DIR` 指向原目录）。
 
 #### 开发
 
@@ -172,12 +178,33 @@ npm run lint       # ESLint 检查
 docker compose up -d    # 启动 Redis + Bot
 ```
 
+#### systemd 部署
+
+```bash
+npm run build
+npm run build:miniapp
+sudo ./scripts/install-systemd.sh
+sudo systemctl restart xxb-ts
+sudo systemctl status xxb-ts
+```
+
+常用命令：
+
+```bash
+sudo systemctl restart xxb-ts
+sudo systemctl stop xxb-ts
+sudo systemctl status xxb-ts
+journalctl -u xxb-ts -f
+```
+
 #### PM2 部署
 
 ```bash
 npm run build
 pm2 start ecosystem.config.cjs --env production
 ```
+
+PM2 仅建议作为备用手动方案保留；正式常驻运行优先使用 systemd。
 
 ### ⚙️ 配置
 
@@ -262,7 +289,7 @@ xxb-ts (啾咪囝) is a Telegram group chat AI bot written in TypeScript. It act
 ### Quick Start
 
 ```bash
-git clone https://github.com/zhongyang001-tech/xxb-ts.git
+git clone https://github.com/ZYHUO/xxb-ts.git
 cd xxb-ts
 npm install
 cp .env.example .env

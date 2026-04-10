@@ -18,9 +18,12 @@ const BLOCKED_RANGES = [
   /^192\.168\./,                  // 192.168.0.0/16
   /^169\.254\./,                  // 169.254.0.0/16 link-local
   /^0\./,                         // 0.0.0.0/8
+  /^224\./,                       // 224.0.0.0/4 multicast
+  /^240\./,                       // 240.0.0.0/4 reserved (class E)
   /^::1$/,                        // IPv6 loopback
   /^fd[0-9a-f]{2}:/i,            // IPv6 ULA
   /^fe80:/i,                      // IPv6 link-local
+  /^::ffff:/i,                    // IPv4-mapped IPv6
 ];
 
 function isPrivateIp(ip: string): boolean {
@@ -37,10 +40,12 @@ async function validateUrl(url: string): Promise<string | null> {
   // Block localhost variants
   if (hostname === 'localhost' || hostname === '[::1]') return 'Blocked: localhost';
 
-  // DNS resolve to check actual IP
+  // DNS resolve to check actual IP — use {all: true} to check all returned addresses
   try {
-    const { address } = await lookup(hostname);
-    if (isPrivateIp(address)) return `Blocked: ${hostname} resolves to private IP ${address}`;
+    const addresses = await lookup(hostname, { all: true });
+    for (const { address } of addresses) {
+      if (isPrivateIp(address)) return `Blocked: ${hostname} resolves to private IP ${address}`;
+    }
   } catch {
     // DNS failure — allow through (will fail on fetch anyway)
   }

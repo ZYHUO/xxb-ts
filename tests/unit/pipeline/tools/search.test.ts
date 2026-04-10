@@ -37,7 +37,7 @@ describe('executeSearch', () => {
     }) as unknown as typeof fetch;
 
     const result = await executeSearch('test query');
-    expect(result).toContain('关于"test query"的搜索结果摘要');
+    expect(result).toContain('关于"test query"的搜索结果：');
     expect(result).toContain('Result 1');
     expect(result).toContain('Summary 1');
     expect(result).toContain('Result 2');

@@ -390,3 +390,61 @@ function scoreIntentMatch(
 
   return score;
 }
+
+/** Mini App sticker_kb_list — index rows for admin UI (PHP parity). */
+export function listStickerKbIndex(): Array<{
+  file_unique_id: string;
+  latest_file_id: string | null;
+  set_name: string | null;
+  emoji: string | null;
+  sticker_format: string;
+  usage_count: number;
+  analysis_status: string;
+  asset_status: string;
+}> {
+  const rows = getDb()
+    .prepare(
+      `
+    SELECT file_unique_id, latest_file_id, set_name, emoji, sticker_format,
+ usage_count, analysis_status, asset_status
+    FROM sticker_items
+    ORDER BY COALESCE(last_seen_at, 0) DESC
+  `,
+    )
+    .all() as Array<{
+    file_unique_id: string;
+    latest_file_id: string | null;
+    set_name: string | null;
+    emoji: string | null;
+    sticker_format: string;
+    usage_count: number;
+    analysis_status: string;
+    asset_status: string;
+  }>;
+  return rows;
+}
+
+/** Reset sticker to pending for re-analysis (PHP sticker_kb_update requeue). */
+export function requeueStickerAnalysis(fileUniqueId: string): boolean {
+  const r = getDb().prepare(
+    `
+    UPDATE sticker_items SET
+      analysis_status = 'pending',
+      persona_fit = NULL,
+      emotion_tags = NULL,
+      mood_map = NULL,
+      analysis_reason = NULL
+    WHERE file_unique_id = ?
+  `,
+  ).run(fileUniqueId);
+  return r.changes > 0;
+}
+
+/** Update persona_fit only (PHP sticker_kb_update). */
+export function setStickerPersonaFit(fileUniqueId: string, fit: boolean | null): boolean {
+  const v = fit === null ? null : fit ? 1 : 0;
+  const r = getDb()
+    .prepare('UPDATE sticker_items SET persona_fit = ? WHERE file_unique_id = ?')
+    .run(v, fileUniqueId);
+  return r.changes > 0;
+}

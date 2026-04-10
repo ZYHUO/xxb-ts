@@ -5,13 +5,13 @@ import { isRateLimited } from '../middleware/rate-limit.js';
 import { enqueue } from '../../queue/producer.js';
 
 async function handleUpdate(ctx: Context): Promise<void> {
-  const msg = ctx.message ?? ctx.editedMessage;
+  const msg = ctx.message ?? ctx.editedMessage ?? ctx.channelPost ?? ctx.editedChannelPost;
   if (!msg) return;
 
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
   const userId = msg.from?.id;
-  const isEdit = !!ctx.editedMessage;
+  const isEdit = !!(ctx.editedMessage ?? ctx.editedChannelPost);
 
   // Dedup (fail-open on Redis error to avoid silent message loss)
   try {
@@ -27,11 +27,17 @@ async function handleUpdate(ctx: Context): Promise<void> {
     logger.warn({ err, userId }, 'Rate limit check failed, proceeding');
   }
 
+  const senderChat = (msg as unknown as { sender_chat?: { title?: string; username?: string } }).sender_chat;
+  const isAnonymousAdmin = msg.from?.id === 1087968824;
+  const displayName = (isAnonymousAdmin || !msg.from)
+    ? (senderChat?.title ?? senderChat?.username ?? 'channel')
+    : (msg.from?.username ?? msg.from?.first_name ?? 'unknown');
+
   logger.info(
     {
       chatId,
       messageId,
-      from: msg.from?.username ?? msg.from?.first_name ?? 'unknown',
+      from: displayName,
       text: (msg.text ?? msg.caption)?.slice(0, 80),
     },
     'Message received',
@@ -51,4 +57,6 @@ async function handleUpdate(ctx: Context): Promise<void> {
 export function registerMessageHandler(bot: Bot): void {
   bot.on('message', handleUpdate);
   bot.on('edited_message', handleUpdate);
+  bot.on('channel_post', handleUpdate);
+  bot.on('edited_channel_post', handleUpdate);
 }

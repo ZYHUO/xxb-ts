@@ -1,4 +1,6 @@
 import type { Redis } from 'ioredis';
+import { getLabel, getLabels, getUsage } from '../ai/labels.js';
+import type { AILabel, AIUsage } from '../ai/types.js';
 import { logger } from '../shared/logger.js';
 
 const OVERRIDE_KEY = 'xxb:admin:model_routing:override';
@@ -38,6 +40,61 @@ export async function saveOverride(redis: Redis, override: RuntimeOverride): Pro
   await redis.set(OVERRIDE_KEY, JSON.stringify(override));
 }
 
+export function buildProviderCatalog(
+  override: RuntimeOverride | null,
+): Record<string, ProviderOverride> {
+  const builtIns = Object.fromEntries(
+    Array.from(getLabels().entries()).map(([name, label]) => [
+      name,
+      {
+        endpoint: label.endpoint,
+        model: label.model,
+        api_keys: label.apiKeys,
+      },
+    ]),
+  );
+  return {
+    ...builtIns,
+    ...(override?.providers ?? {}),
+  };
+}
+
+export function resolveUsageForRuntime(
+  usageName: string,
+  override: RuntimeOverride | null,
+): AIUsage {
+  const usage = getUsage(usageName);
+  const overrideUsage = (override?.usage as Record<string, { label?: string; backups?: string[] } | undefined> | undefined)?.[usageName];
+  if (overrideUsage?.label) {
+    usage.label = overrideUsage.label;
+  }
+  if (Array.isArray(overrideUsage?.backups)) {
+    usage.backups = overrideUsage.backups.filter((item) => typeof item === 'string' && item.trim() !== '');
+  }
+  return usage;
+}
+
+export function resolveLabelForRuntime(
+  labelName: string,
+  override: RuntimeOverride | null,
+): AILabel {
+  const builtIn = getLabels().get(labelName);
+  const provider = buildProviderCatalog(override)[labelName];
+  if (!provider) {
+    if (!builtIn) throw new Error(`AI label not found: ${labelName}`);
+    return builtIn;
+  }
+
+  return {
+    name: labelName,
+    endpoint: provider.endpoint,
+    apiKeys: provider.api_key ? [provider.api_key] : (provider.api_keys ?? builtIn?.apiKeys ?? []),
+    model: provider.model,
+    stream: builtIn?.stream,
+    capabilities: builtIn?.capabilities,
+  };
+}
+
 export function buildModelRoutingAdminView(
   envConfig: {
     AI_MODEL_REPLY: string;
@@ -47,6 +104,7 @@ export function buildModelRoutingAdminView(
   },
   override: RuntimeOverride | null,
 ): Record<string, unknown> {
+  const providers = buildProviderCatalog(override);
   return {
     defaults: {
       reply: envConfig.AI_MODEL_REPLY,
@@ -55,7 +113,11 @@ export function buildModelRoutingAdminView(
       allowlist_review: envConfig.AI_MODEL_ALLOWLIST_REVIEW,
     },
     override: override?.usage ?? null,
-    providers: override?.providers ?? {},
+    effective: {
+      reply: resolveUsageForRuntime('reply', override),
+      allowlist_review: resolveUsageForRuntime('allowlist_review', override),
+    },
+    providers,
     has_override: override !== null && (!!override.providers || !!override.usage),
   };
 }

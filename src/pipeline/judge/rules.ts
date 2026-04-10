@@ -114,6 +114,7 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
   }
 
   // 7. Recent reply (last bot reply within 5 messages) AND not mentioned → IGNORE
+  // lastBotReplyIndex = 0 means bot was the last message; < 5 means within the last 5 messages.
   if (lastBotReplyIndex >= 0 && lastBotReplyIndex < 5) {
     return makeResult('IGNORE', 'recent_reply');
   }

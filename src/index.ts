@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { logger } from './shared/logger.js';
 import { env } from './env.js';
@@ -13,6 +14,7 @@ import { createAllowlistMiddleware } from './bot/middleware/allowlist.js';
 import { registerMemberHandler } from './bot/handlers/member.js';import { createAdminApi } from './admin/api.js';
 import { startCronJobs, stopCronJobs } from './cron/scheduler.js';
 import { initBotTracker } from './tracking/interaction.js';
+import { isMemoryAvailable } from './memory/chroma.js';
 import type { AllowlistConfig } from './allowlist/types.js';
 
 async function main(): Promise<void> {
@@ -76,6 +78,8 @@ async function main(): Promise<void> {
   // 10. Start Hono HTTP server (health check + admin API)
   const app = new Hono();
   app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }));
+  app.get('/miniapp', (c) => c.redirect('/miniapp/'));
+  app.use('/miniapp/*', serveStatic({ root: './' }));
 
   // Mount admin API at /miniapp_api
   const adminApi = createAdminApi({
@@ -105,6 +109,11 @@ async function main(): Promise<void> {
 
   // 12. Start cron jobs
   startCronJobs({ cleanupDeps: { redis, allowlistConfig } });
+
+  // 12.1 Warm up ChromaDB + embedder (fire-and-forget)
+  isMemoryAvailable().then((ok) => {
+    logger.info({ ok }, 'Memory availability check');
+  }).catch(() => { /* non-critical */ });
 
   // 13. Graceful shutdown
   let shuttingDown = false;
