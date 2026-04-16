@@ -139,61 +139,52 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     }
     timings["format"] = Math.round(performance.now() - t0);
 
-    // 2. Vision — if image present, describe it
-    if (formatted.imageFileId) {
-      const t1 = performance.now();
-      try {
-        const description = await describeImage(formatted.imageFileId);
-        if (description) {
-          formatted.imageDescriptions = [description];
-        }
-      } catch (err) {
-        logger.warn({ err }, "Vision failed, continuing without description");
-      }
-      timings["vision"] = Math.round(performance.now() - t1);
-    }
-
-    // 2.1 Sticker — describe via cache or vision (no emoji reading)
-    if (formatted.sticker) {
-      const t1s = performance.now();
-      try {
-        const desc = await describeStickerCached(
-          formatted.sticker.fileId,
-          formatted.sticker.fileUniqueId,
+    // 1.5 Channel source ingestion — store and return, no reply
+    const channelSourceIds = env().CHANNEL_SOURCE_IDS;
+    if (channelSourceIds.length > 0 && channelSourceIds.includes(job.chatId)) {
+      const text = formatted.textContent || formatted.captionContent || "";
+      if (text.trim()) {
+        memorizeMessage(job.chatId, formatted).catch((err) => {
+          logger.debug({ err, chatId: job.chatId }, "Channel source memory write failed");
+        });
+        logger.info(
+          { chatId: job.chatId, messageId: formatted.messageId, len: text.length },
+          "Channel source ingested",
         );
-        if (desc && desc !== "[图片]") {
-          // Inject description into sticker so slim.ts can use it
-          (formatted.sticker as { description?: string }).description = desc;
-        }
-      } catch (err) {
-        logger.warn({ err }, "Sticker description failed, continuing");
       }
-      timings["stickerVision"] = Math.round(performance.now() - t1s);
+      return;
     }
 
-    // 2.5 Multimodal — describe audio, documents, video
-    if (
+    // 2. Vision / Sticker / Multimodal — run in parallel
+    const hasMedia = !!(
+      formatted.imageFileId ||
+      formatted.sticker ||
       formatted.audioFileId ||
       formatted.voiceFileId ||
       formatted.documentFileId ||
       formatted.videoFileId ||
       formatted.videoNoteFileId
-    ) {
-      const tm = performance.now();
-      try {
-        const desc = await describeMultimodal(formatted);
-        if (desc) {
-          formatted.textContent = (
-            formatted.textContent ? formatted.textContent + "\n" + desc : desc
-          ).trim();
-        }
-      } catch (err) {
-        logger.warn(
-          { err },
-          "Multimodal processing failed, continuing without description",
-        );
-      }
-      timings["multimodal"] = Math.round(performance.now() - tm);
+    );
+    if (hasMedia) {
+      const tmedia = performance.now();
+      await Promise.all([
+        formatted.imageFileId
+          ? describeImage(formatted.imageFileId)
+              .then((d) => { if (d) formatted.imageDescriptions = [d]; })
+              .catch((err) => logger.warn({ err }, "Vision failed, continuing"))
+          : Promise.resolve(),
+        formatted.sticker
+          ? describeStickerCached(formatted.sticker.fileId, formatted.sticker.fileUniqueId)
+              .then((d) => { if (d && d !== "[图片]") (formatted.sticker as { description?: string }).description = d; })
+              .catch((err) => logger.warn({ err }, "Sticker description failed, continuing"))
+          : Promise.resolve(),
+        (formatted.audioFileId || formatted.voiceFileId || formatted.documentFileId || formatted.videoFileId || formatted.videoNoteFileId)
+          ? describeMultimodal(formatted)
+              .then((d) => { if (d) formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + d : d).trim(); })
+              .catch((err) => logger.warn({ err }, "Multimodal processing failed, continuing"))
+          : Promise.resolve(),
+      ]);
+      timings["media"] = Math.round(performance.now() - tmedia);
     }
 
     // 3. Save to context
@@ -353,9 +344,9 @@ export async function processPipeline(job: ChatJob): Promise<void> {
 
     // 4. Judge (L0 → L1 → L2)
     const t3 = performance.now();
-    const recentMessages = await getRecent(job.chatId, e.JUDGE_WINDOW_SIZE);
-    // L2 uses a larger context window for better accuracy
+    // Fetch larger window once; L1 uses full set, L0/L2 slice as needed
     const recentMessagesL2 = await getRecent(job.chatId, e.JUDGE_WINDOW_SIZE * 3);
+    const recentMessages = recentMessagesL2.slice(-e.JUDGE_WINDOW_SIZE);
 
     const now = Math.floor(Date.now() / 1000);
     const fiveMinAgo = now - 300;
@@ -378,6 +369,31 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       groupActivity: { messagesLast5Min, messagesLast1Hour },
     });
     timings["judge"] = Math.round(performance.now() - t3);
+
+    // If L0 returned REPLY without a replyPath (reply_to_self / mention_self),
+    // ask L1 micro judge to decide direct vs planned so natural language works.
+    if (
+      judgeResult.action === "REPLY" &&
+      judgeResult.replyPath === undefined &&
+      judgeResult.level === "L0_RULE"
+    ) {
+      const { microJudge } = await import("./judge/micro.js");
+      const pathResult = await microJudge(
+        formatted,
+        recentMessages,
+        botUid,
+        "judge",
+        "",
+        job.chatId,
+      );
+      if (pathResult.replyPath) {
+        judgeResult.replyPath = pathResult.replyPath;
+      }
+      if (pathResult.replyTier) {
+        judgeResult.replyTier = pathResult.replyTier;
+      }
+    }
+
     const rawReplyPath = resolveReplyPath(
       judgeResult.action,
       judgeResult.replyPath,
@@ -888,6 +904,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
             stickerPolicy.enabled &&
             stickerPolicy.mode !== "off" &&
             reply.stickerIntent &&
+            reply.stickerIntent.length > 0 &&
             Math.random() < 0.15
           ) {
             const candidates = getReadyStickersByIntent(reply.stickerIntent);
@@ -897,7 +914,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
               const picked = pool[Math.floor(Math.random() * pool.length)]!;
               stickerFileId = picked.fileId;
               stickerFileUniqueId = picked.fileUniqueId;
-              stickerIntent = reply.stickerIntent;
+              stickerIntent = reply.stickerIntent[0];
             }
           }
 

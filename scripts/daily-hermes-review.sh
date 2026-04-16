@@ -111,7 +111,7 @@ result = subprocess.run(
     [openclaw_bin, 'agent', '--agent', agent, '--message', prompt, '--json'],
     capture_output=True,
     text=True,
-    timeout=180,
+    timeout=600,
 )
 combined = ''
 if result.stderr:

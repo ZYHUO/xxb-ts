@@ -68,10 +68,8 @@ export interface JudgeResult {
 export interface ReplyOutput {
   replyContent: string;
   targetMessageId: number;
-  stickerIntent?:
-    | 'cute' | 'comfort' | 'tease' | 'happy' | 'sleepy'
-    | 'curious' | 'playful' | 'confused' | 'shy' | 'sad'
-    | 'smug' | 'annoyed' | 'dramatic' | 'cozy' | 'love';
+  /** Up to 3 sticker intents in priority order */
+  stickerIntent?: string[];
   replyQuote?: boolean;
 }
 

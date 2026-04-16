@@ -12,6 +12,35 @@ const PROFILE_SYNC_BATCH_SIZE = 20;
 const MAX_PENDING = 50;      // 积累多少条消息再总结
 const MIN_PENDING_TO_SUMMARIZE = 8;
 const MAX_PROMPT_CHARS = 600;
+const BUFFER_FLUSH_SIZE = 10;   // flush after this many messages per user
+const BUFFER_FLUSH_MS = 30_000; // or after 30 seconds
+
+interface BufferEntry { chatId: number; uid: number; username: string; fullName: string; senderTag?: string; texts: string[]; timer: ReturnType<typeof setTimeout> }
+const _writeBuffer = new Map<string, BufferEntry>();
+
+function flushBuffer(key: string): void {
+  const entry = _writeBuffer.get(key);
+  if (!entry) return;
+  _writeBuffer.delete(key);
+  clearTimeout(entry.timer);
+  const db = getDb();
+  for (const text of entry.texts) {
+    db.prepare(`
+      INSERT INTO user_profiles (chat_id, uid, username, full_name, sender_tag, pending_messages, updated_at)
+      VALUES (?, ?, ?, ?, ?, json_array(?), unixepoch())
+      ON CONFLICT(chat_id, uid) DO UPDATE SET
+        username     = excluded.username,
+        full_name    = excluded.full_name,
+        sender_tag   = COALESCE(excluded.sender_tag, sender_tag),
+        pending_messages = CASE
+          WHEN json_array_length(pending_messages) >= ${MAX_PENDING}
+          THEN json_insert(json_remove(pending_messages, '$[0]'), '$[#]', ?)
+          ELSE json_insert(pending_messages, '$[#]', ?)
+        END,
+        updated_at   = unixepoch()
+    `).run(entry.chatId, entry.uid, entry.username, entry.fullName, entry.senderTag ?? null, text, text, text);
+  }
+}
 
 interface ProfileRow {
   chat_id: number;
@@ -26,6 +55,11 @@ interface ProfileRow {
 
 // ── 写入侧（每条消息调用，同步，极快）────────────────────
 
+/** @internal test helper — flush all pending write buffers immediately */
+export function _flushAllBuffers(): void {
+  for (const key of [..._writeBuffer.keys()]) flushBuffer(key);
+}
+
 export function recordUserMessage(
   chatId: number,
   uid: number,
@@ -35,23 +69,23 @@ export function recordUserMessage(
   text: string,
 ): void {
   if (!text.trim()) return;
-  const db = getDb();
-
-  // Upsert row, append message to pending_messages
-  db.prepare(`
-    INSERT INTO user_profiles (chat_id, uid, username, full_name, sender_tag, pending_messages, updated_at)
-    VALUES (?, ?, ?, ?, ?, json_array(?), unixepoch())
-    ON CONFLICT(chat_id, uid) DO UPDATE SET
-      username     = excluded.username,
-      full_name    = excluded.full_name,
-      sender_tag   = COALESCE(excluded.sender_tag, sender_tag),
-      pending_messages = CASE
-        WHEN json_array_length(pending_messages) >= ${MAX_PENDING}
-        THEN json_insert(json_remove(pending_messages, '$[0]'), '$[#]', ?)
-        ELSE json_insert(pending_messages, '$[#]', ?)
-      END,
-      updated_at   = unixepoch()
-  `).run(chatId, uid, username, fullName, senderTag ?? null, text, text, text);
+  const key = `${chatId}:${uid}`;
+  let entry = _writeBuffer.get(key);
+  if (!entry) {
+    entry = {
+      chatId, uid, username, fullName, senderTag,
+      texts: [],
+      timer: setTimeout(() => flushBuffer(key), BUFFER_FLUSH_MS),
+    };
+    entry.timer.unref?.();
+    _writeBuffer.set(key, entry);
+  } else {
+    entry.username = username;
+    entry.fullName = fullName;
+    if (senderTag) entry.senderTag = senderTag;
+  }
+  entry.texts.push(text);
+  if (entry.texts.length >= BUFFER_FLUSH_SIZE) flushBuffer(key);
 }
 
 // ── 读取侧（reply 时注入，同步，极快）────────────────────

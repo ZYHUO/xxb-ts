@@ -26,14 +26,14 @@ describe('Reply Parser', () => {
       const result = parseSingle(raw, fallbackId);
       expect(result.replyContent).toBe('喵~');
       expect(result.targetMessageId).toBe(42);
-      expect(result.stickerIntent).toBe('cute');
+      expect(result.stickerIntent).toEqual(['cute']);
     });
 
     it('parses JSON with all valid stickerIntent values', () => {
       for (const intent of ['cute', 'comfort', 'tease', 'happy', 'sleepy'] as const) {
         const raw = `{"replyContent": "test", "targetMessageId": 1, "stickerIntent": "${intent}"}`;
         const result = parseSingle(raw, fallbackId);
-        expect(result.stickerIntent).toBe(intent);
+        expect(result.stickerIntent).toEqual([intent]);
       }
     });
 
@@ -119,7 +119,7 @@ describe('Reply Parser', () => {
       const raw = '<response><reply_content><![CDATA[test]]></reply_content><target_message_id>50</target_message_id><sticker_intent>happy</sticker_intent></response>';
       const result = parseSingle(raw, fallbackId);
       expect(result.replyContent).toBe('test');
-      expect(result.stickerIntent).toBe('happy');
+      expect(result.stickerIntent).toEqual(['happy']);
     });
 
     it('strips residual CDATA markers', () => {
@@ -221,7 +221,7 @@ describe('Reply Parser', () => {
       expect(result[1]).toEqual({
         replyContent: 'second',
         targetMessageId: 2,
-        stickerIntent: 'cute',
+        stickerIntent: ['cute'],
       });
     });
   });

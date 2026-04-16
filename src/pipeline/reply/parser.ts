@@ -9,18 +9,35 @@ const STICKER_INTENTS = [
   'cute', 'comfort', 'tease', 'happy', 'sleepy',
   'curious', 'playful', 'confused', 'shy', 'sad',
   'smug', 'annoyed', 'dramatic', 'cozy', 'love',
+  'shocked', 'proud', 'laughing', 'pensive', 'excited',
+  'sarcastic', 'nervous', 'relieved', 'determined', 'mischievous',
+  'bored', 'disappointed', 'grateful', 'surprised', 'embarrassed',
+  'thinking', 'celebrating', 'crying_happy', 'rage', 'blank',
 ] as const;
+
+const stickerIntentEnum = z.enum(STICKER_INTENTS);
+
+/** Normalize stickerIntent: accept string or string[], return string[] | undefined */
+function normalizeStickerIntent(raw: unknown): string[] | undefined {
+  if (!raw) return undefined;
+  const arr = Array.isArray(raw) ? raw : [raw];
+  const valid = arr
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter((v) => stickerIntentEnum.safeParse(v).success)
+    .slice(0, 3);
+  return valid.length > 0 ? valid : undefined;
+}
 
 const replyOutputSchema = z.object({
   replyContent: z.string().min(1),
   targetMessageId: z.number().int(),
-  stickerIntent: z.enum(STICKER_INTENTS).optional(),
+  stickerIntent: z.union([z.enum(STICKER_INTENTS), z.array(z.enum(STICKER_INTENTS))]).optional(),
 });
 
 export interface ParsedReply {
   replyContent: string;
   targetMessageId: number;
-  stickerIntent?: (typeof STICKER_INTENTS)[number];
+  stickerIntent?: string[];
   handoffToSplitter?: boolean;
   replyQuote?: boolean;
 }
@@ -244,7 +261,7 @@ function validateAndReturn(
   const normalized: Record<string, unknown> = {
     replyContent: data['replyContent'] ?? data['reply_content'] ?? data['content'],
     targetMessageId: data['targetMessageId'] ?? data['target_message_id'] ?? fallbackMessageId,
-    stickerIntent: data['stickerIntent'] ?? data['sticker_intent'],
+    stickerIntent: normalizeStickerIntent(data['stickerIntent'] ?? data['sticker_intent']),
   };
 
   // Ensure targetMessageId is a number
@@ -257,7 +274,13 @@ function validateAndReturn(
 
   const parsed = replyOutputSchema.safeParse(normalized);
   if (parsed.success) {
-    const result = truncateReply(parsed.data);
+    const { stickerIntent, ...rest } = parsed.data;
+    const result: ParsedReply = truncateReply({
+      ...rest,
+      stickerIntent: stickerIntent
+        ? (Array.isArray(stickerIntent) ? stickerIntent : [stickerIntent])
+        : undefined,
+    });
     if (data['handoffToSplitter'] === true) {
       result.handoffToSplitter = true;
     }

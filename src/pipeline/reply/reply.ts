@@ -80,6 +80,7 @@ function normalizeForDuplicateCheck(text: string): string {
  * Check if reply is a duplicate of recent assistant messages.
  */
 async function isDuplicateReply(chatId: number, replyContent: string): Promise<boolean> {
+  if (replyContent.length < 20) return false; // short replies are never considered duplicates
   const recent = await getRecent(chatId, 10);
   const recentAssistant = recent
     .filter((m) => m.role === 'assistant')
@@ -244,13 +245,32 @@ export async function generateReply(
     });
 
     if (plan.needTools && plan.steps.length > 0) {
-      try {
-        const executedSteps = await executeToolPlan(plan, { chatId, userId: message.uid });
-        toolsUsed = executedSteps.map((step) => step.tool);
-        toolResultsBlock = formatToolResultsForPrompt(executedSteps);
-      } catch (err) {
-        toolExecutionFailed = true;
-        logger.warn({ err, chatId, plan }, 'Tool plan execution failed, falling back to final writer without tool results');
+      let attempt = 0;
+      while (attempt <= 1) {
+        try {
+          const executedSteps = await executeToolPlan(plan, { chatId, userId: message.uid });
+          toolsUsed = executedSteps.map((step) => step.tool);
+          toolResultsBlock = formatToolResultsForPrompt(executedSteps);
+          break;
+        } catch (err) {
+          attempt++;
+          if (attempt > 1) {
+            toolExecutionFailed = true;
+            logger.warn({ err, chatId, plan }, 'Tool plan execution failed after retry');
+          } else {
+            logger.warn({ err, chatId }, 'Tool plan execution failed, retrying once');
+          }
+        }
+      }
+      if (toolExecutionFailed) {
+        return {
+          replies: [{
+            replyContent: '喵呜，本喵查了一下但没查到相关信息，稍后再试试吧~',
+            targetMessageId: message.messageId,
+          }],
+          toolsUsed: [],
+          toolExecutionFailed: true,
+        };
       }
     }
   }
@@ -283,7 +303,7 @@ export async function generateReply(
     logger.info({ chatId }, 'Duplicate reply detected, regenerating');
     for (let i = 0; i < MAX_DUPLICATE_RETRIES; i++) {
       result = await generateReplyModelOutput(messages, usage, {
-        temperatureOverride: 1.2,
+        temperatureOverride: 1.0,
       });
       result.toolsUsed = toolsUsed;
       parsedReplies = parseReplyResponse(result.content, message.messageId);

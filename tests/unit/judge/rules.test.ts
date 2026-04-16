@@ -61,7 +61,7 @@ describe("L0 Rules Engine", () => {
     const result = evaluateRules(ctx);
     expect(result).not.toBeNull();
     expect(result!.action).toBe("REPLY");
-    expect(result!.replyPath).toBe("direct");
+    expect(result!.replyPath).toBeUndefined();
     expect(result!.replyTier).toBe("normal");
     expect(result!.rule).toBe("mention_self");
   });

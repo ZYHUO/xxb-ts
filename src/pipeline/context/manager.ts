@@ -22,7 +22,7 @@ local len = redis.call('LLEN', key)
 local maxLen = tonumber(ARGV[2])
 local trimSize = tonumber(ARGV[3])
 if len > maxLen then
-  redis.call('LTRIM', key, len - trimSize, -1)
+  redis.call('LTRIM', key, len - maxLen, -1)
 end
 redis.call('EXPIRE', key, tonumber(ARGV[4]))
 return len
@@ -76,9 +76,9 @@ export async function getRecent(chatId: number, count: number): Promise<Formatte
   return raw.map((r) => JSON.parse(r) as FormattedMessage);
 }
 
-export async function getAll(chatId: number): Promise<FormattedMessage[]> {
+export async function getAll(chatId: number, limit = 500): Promise<FormattedMessage[]> {
   const redis = getRedis();
-  const raw = await redis.lrange(ctxKey(chatId), 0, -1);
+  const raw = await redis.lrange(ctxKey(chatId), -limit, -1);
   return raw.map((r) => JSON.parse(r) as FormattedMessage);
 }
 

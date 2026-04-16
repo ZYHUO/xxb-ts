@@ -36,6 +36,7 @@ const envSchema = z.object({
   STREAMING_MIN_CHARS: z.coerce.number().int().nonnegative().default(50),
 
   // Tool System
+  SKILLS_DIR: z.string().default('./data/skills'),
   SEARXNG_URL: z.string().url().optional(),
   XAI_API_KEY: z.string().optional(),
   XAI_SEARCH_MODEL: z.string().default('grok-4-0709'),
@@ -95,6 +96,29 @@ const envSchema = z.object({
     }),
   KNOWLEDGE_CRON_SCHEDULE: z.string().default('30 * * * *'),
   KNOWLEDGE_CRON_HASH_PATH: z.string().optional(),
+
+  // Channel source IDs — channel posts from these channels are ingested into ChromaDB as knowledge
+  CHANNEL_SOURCE_IDS: z
+    .string()
+    .default('')
+    .transform((s) => {
+      const t = s.trim();
+      if (!t) return [] as number[];
+      return t
+        .split(',')
+        .map((x) => Number(x.trim()))
+        .filter((n) => !Number.isNaN(n) && n !== 0);
+    }),
+
+  // Public channel usernames to scrape (no admin needed, uses t.me/s/ web page)
+  CHANNEL_SOURCE_USERNAMES: z
+    .string()
+    .default('')
+    .transform((s) => {
+      const t = s.trim();
+      if (!t) return [] as string[];
+      return t.split(',').map((x) => x.trim().replace(/^@/, '')).filter(Boolean);
+    }),
 
   // Persona override directory (per-user {uid}.md / .txt)
   PERSONA_DIR: z.string().optional(),

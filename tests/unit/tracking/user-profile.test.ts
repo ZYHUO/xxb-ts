@@ -28,6 +28,7 @@ const {
   getUserProfilePrompt,
   runUserProfileSync,
   muteUser,
+  _flushAllBuffers,
 } = await import('../../../src/tracking/user-profile.js');
 
 function initSchema(db: Database.Database): void {
@@ -50,12 +51,14 @@ describe('user-profile', () => {
   });
 
   afterEach(() => {
+    _flushAllBuffers(); // flush any pending write buffers before closing DB
     testDb.close();
   });
 
   it('appends pending_messages as a valid JSON array across multiple writes', () => {
     recordUserMessage(-1001, 42, 'alice', 'Alice', undefined, 'first');
     recordUserMessage(-1001, 42, 'alice', 'Alice', undefined, 'second');
+    _flushAllBuffers();
 
     const row = testDb
       .prepare('SELECT pending_messages FROM user_profiles WHERE chat_id = ? AND uid = ?')
@@ -67,6 +70,7 @@ describe('user-profile', () => {
   it('does not summarize when pending sample count is below threshold', async () => {
     recordUserMessage(-1001, 42, 'alice', 'Alice', 'curious', 'first');
     recordUserMessage(-1001, 42, 'alice', 'Alice', 'curious', 'second');
+    _flushAllBuffers();
 
     await runUserProfileSync();
 
@@ -99,6 +103,7 @@ describe('user-profile', () => {
     for (let i = 1; i <= 8; i++) {
       recordUserMessage(-1001, 42, 'alice', 'Alice', 'curious', `msg-${i}`);
     }
+    _flushAllBuffers();
     mockCallWithFallback.mockResolvedValue({ content: '喜欢提问，表达直接。' });
 
     await runUserProfileSync();
@@ -114,6 +119,7 @@ describe('user-profile', () => {
     for (let i = 1; i <= 8; i++) {
       recordUserMessage(-1001, 42, 'alice', 'Alice', '威严满满', `msg-${i}`);
     }
+    _flushAllBuffers();
     mockCallWithFallback.mockResolvedValue({ content: '表达直接，偏理性。' });
 
     await runUserProfileSync();

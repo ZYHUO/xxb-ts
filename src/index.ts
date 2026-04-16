@@ -24,6 +24,7 @@ import {
   shouldRegisterBotCommands,
   shouldWarmMemory,
 } from './startup/side-effects.js';
+import { preloadSkills } from './pipeline/tools/registry.js';
 
 async function main(): Promise<void> {
   logger.info('xxb-ts starting…');
@@ -31,6 +32,9 @@ async function main(): Promise<void> {
   // 1. Validate env
   const config = env();
   logger.info({ nodeEnv: config.NODE_ENV }, 'Environment validated');
+
+  // 1.5 Preload external skills
+  void preloadSkills();
 
   // 2. Connect Redis
   const redis = getRedis();

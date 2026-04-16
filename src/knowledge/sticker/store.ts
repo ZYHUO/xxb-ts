@@ -308,7 +308,7 @@ export function setRawAssetPath(fileUniqueId: string, rawPath: string): boolean 
 }
 
 export function getReadyStickersByIntent(
-  intent: string,
+  intent: string | string[],
 ): Array<{ fileId: string; fileUniqueId: string; score: number }> {
   const rows = getDb().prepare(`
     SELECT file_unique_id, latest_file_id, emotion_tags, mood_map, user_score
@@ -325,6 +325,7 @@ export function getReadyStickersByIntent(
     user_score: number;
   }>;
 
+  const intents = Array.isArray(intent) ? intent : [intent];
   const candidates: Array<{ fileId: string; fileUniqueId: string; score: number }> = [];
 
   for (const row of rows) {
@@ -332,7 +333,7 @@ export function getReadyStickersByIntent(
     const moodMap = safeJsonParse<Record<string, number>>(row.mood_map, null) ?? {};
     const userScore = row.user_score ?? 1.0;
 
-    const intentScore = scoreIntentMatch(intent, emotionTags, moodMap);
+    const intentScore = Math.max(...intents.map((i) => scoreIntentMatch(i, emotionTags, moodMap)));
     if (intentScore > 0) {
       candidates.push({
         fileId: row.latest_file_id,

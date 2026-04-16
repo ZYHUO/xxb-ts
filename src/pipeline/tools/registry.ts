@@ -11,6 +11,19 @@ import { executeIpQuality } from './ip-quality.js';
 import { addTimer, listTimers, deleteTimer } from './timer.js';
 import { queryBotKnowledge } from './bot-knowledge.js';
 import { env } from '../../env.js';
+import { loadSkills } from './skill-loader.js';
+
+// Skills are loaded once at startup and cached
+let _skillsCache: Record<string, Tool> | undefined;
+let _skillsLoading: Promise<void> | undefined;
+
+export function preloadSkills(): Promise<void> {
+  if (_skillsLoading) return _skillsLoading;
+  _skillsLoading = loadSkills(env().SKILLS_DIR).then((skills) => {
+    _skillsCache = skills;
+  });
+  return _skillsLoading;
+}
 
 export function buildToolSet(chatId: number, userId: number) {
   const e = env();
@@ -95,6 +108,11 @@ export function buildToolSet(chatId: number, userId: number) {
     }),
     execute: async ({ query }) => queryBotKnowledge(chatId, query),
   });
+
+  // External skills (loaded from SKILLS_DIR)
+  if (_skillsCache) {
+    Object.assign(tools, _skillsCache);
+  }
 
   return tools;
 }

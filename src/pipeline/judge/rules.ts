@@ -36,11 +36,11 @@ const WHITELISTED_COMMANDS = new Set([
 function makeResult(
   action: JudgeAction,
   rule: string,
-  opts?: { replyPath?: "direct" | "planned" },
+  opts?: { replyPath?: "direct" | "planned"; skipPathResolution?: boolean },
 ): JudgeResult {
   return {
     action,
-    replyPath: resolveReplyPath(action, opts?.replyPath),
+    replyPath: opts?.skipPathResolution ? undefined : resolveReplyPath(action, opts?.replyPath),
     replyTier: resolveReplyTier(action),
     level: "L0_RULE",
     rule,
@@ -176,6 +176,11 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
     lastBotReplyIndex,
   } = ctx;
   const text = msg.textContent || msg.captionContent || "";
+  // Recent message texts for context-aware URL detection (last 3 non-bot messages)
+  const recentTexts = ctx.recentMessages
+    .slice(-3)
+    .map((m) => m.textContent || m.captionContent || "")
+    .filter(Boolean);
 
   // 1. Bot message — check if humans are present before engaging
   if (msg.isBot && msg.uid !== botUid) {
@@ -244,12 +249,12 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
         replyPath: "planned",
       });
     }
-    if (looksLikeExternalLookupRequest(text)) {
+    if (looksLikeExternalLookupRequest(text, recentTexts)) {
       return makeResult("REPLY", "reply_to_self_lookup", {
         replyPath: "planned",
       });
     }
-    return makeResult("REPLY", "reply_to_self");
+    return makeResult("REPLY", "reply_to_self", { skipPathResolution: true });
   }
 
   // 3. Slash commands — only if directed at us (no @suffix, or @our_bot)
@@ -295,12 +300,12 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
     if (looksLikeForgetRequest(text)) {
       return makeResult("REPLY", "forget_request");
     }
-    if (looksLikeExternalLookupRequest(text)) {
+    if (looksLikeExternalLookupRequest(text, recentTexts)) {
       return makeResult("REPLY", "mention_self_lookup", {
         replyPath: "planned",
       });
     }
-    return makeResult("REPLY", "mention_self");
+    return makeResult("REPLY", "mention_self", { skipPathResolution: true });
   }
 
   // 5. Forwarded message → IGNORE

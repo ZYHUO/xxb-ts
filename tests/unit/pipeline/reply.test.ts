@@ -237,18 +237,15 @@ describe('generateReply', () => {
   });
 
   it('planned path degrades safely when tool execution fails', async () => {
-    mockExecuteToolPlan.mockRejectedValueOnce(new Error('Unknown or non-executable tool: MADE_UP_TOOL'));
+    mockExecuteToolPlan.mockRejectedValue(new Error('Unknown or non-executable tool: MADE_UP_TOOL'));
 
     const result = await generateReply(makeMessage(), makeContext(), 'REPLY', 123, 9999, 'planned', 'normal');
 
     expect(mockPlanReply).toHaveBeenCalledTimes(1);
-    expect(mockExecuteToolPlan).toHaveBeenCalledTimes(1);
-    expect(mockCallWithFallback).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      replies: [{ replyContent: 'direct reply', targetMessageId: 42, stickerIntent: undefined }],
-      toolsUsed: [],
-      toolExecutionFailed: true,
-    });
+    expect(mockExecuteToolPlan).toHaveBeenCalledTimes(2); // retried once
+    expect(mockCallWithFallback).toHaveBeenCalledTimes(0); // no final writer called
+    expect(result.toolExecutionFailed).toBe(true);
+    expect(result.replies[0]?.replyContent).toContain('没查到');
   });
 
   it('retries with strict count instruction when user explicitly asks for two messages', async () => {

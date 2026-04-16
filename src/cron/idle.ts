@@ -15,10 +15,7 @@ const TRIGGER_PROBABILITY = 0.30;    // 30% chance to fire when idle
 const HOUR_START = 10;               // 10:00 Beijing
 const HOUR_END = 23;                 // 23:00 Beijing
 const CTX_PREFIX = 'xxb:ctx:';
-
-// Track per-chat: last time we proactively messaged (to avoid back-to-back pokes)
-const MAX_PROACTIVE_TS = 500;
-const lastProactiveTs: Map<number, number> = new Map();
+const LAST_POKE_PREFIX = 'xxb:last_poke:';
 const MIN_PROACTIVE_INTERVAL = 90 * 60; // at least 90 min between proactive pokes per chat
 
 const sender = new StreamingSender();
@@ -76,11 +73,13 @@ export async function runIdleCheck(): Promise<void> {
 
   const now = Math.floor(Date.now() / 1000);
   const e = env();
+  const redis = getRedis();
 
   for (const chatId of chatIds) {
     try {
-      // Check if we sent a proactive message recently in this chat
-      const lastPoke = lastProactiveTs.get(chatId) ?? 0;
+      // Check if we sent a proactive message recently in this chat (Redis-persisted)
+      const lastPokeRaw = await redis.get(LAST_POKE_PREFIX + chatId);
+      const lastPoke = lastPokeRaw ? parseInt(lastPokeRaw, 10) : 0;
       if (now - lastPoke < MIN_PROACTIVE_INTERVAL) continue;
 
       // Get recent messages to check silence
@@ -130,11 +129,7 @@ export async function runIdleCheck(): Promise<void> {
       if (!text || text.length < 2) continue;
 
       await sender.sendDirect(chatId, text);
-      lastProactiveTs.set(chatId, now);
-      if (lastProactiveTs.size > MAX_PROACTIVE_TS) {
-        const oldest = lastProactiveTs.keys().next().value;
-        if (oldest !== undefined) lastProactiveTs.delete(oldest);
-      }
+      await redis.set(LAST_POKE_PREFIX + chatId, String(now), 'EX', MIN_PROACTIVE_INTERVAL * 2);
 
       logger.info({ chatId, text, silenceSec }, 'Idle proactive message sent');
     } catch (err) {

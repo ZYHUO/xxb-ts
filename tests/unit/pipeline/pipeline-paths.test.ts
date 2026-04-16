@@ -256,6 +256,7 @@ describe("processPipeline path branching", () => {
       BOT_NICKNAMES: ["xxb"],
       JUDGE_WINDOW_SIZE: 20,
       OUTCOME_TRACKING_ENABLED: false,
+      CHANNEL_SOURCE_IDS: [],
     });
     sendDirect.mockResolvedValue({ messageId: 777 });
   });
@@ -391,7 +392,7 @@ describe("processPipeline path branching", () => {
       level: "L1_MICRO",
       latencyMs: 12,
     });
-    mockGetRecent.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([
+    mockGetRecent.mockResolvedValueOnce([]).mockResolvedValueOnce([
       makeFormattedMessage(),
       {
         role: "assistant",

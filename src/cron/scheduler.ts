@@ -11,6 +11,7 @@ import { runCleanup, type CleanupDeps } from './cleanup.js';
 import { runKnowledgeSync } from './knowledge-sync.js';
 import { runUserProfileSync } from '../tracking/user-profile.js';
 import { runIdleCheck } from './idle.js';
+import { runChannelSync } from './channel-sync.js';
 import { logger } from '../shared/logger.js';
 
 export interface CronDeps {
@@ -67,6 +68,11 @@ export function startCronJobs(deps?: CronDeps): void {
   // Idle proactive messaging — every 5 minutes, poke silent group chats
   tasks.push(schedule('*/5 * * * *', () => {
     void safeRun('idle-check', runIdleCheck);
+  }));
+
+  // Channel source scraping — every 30 minutes, fetch public channel posts into ChromaDB
+  tasks.push(schedule('*/30 * * * *', () => {
+    void safeRun('channel-sync', runChannelSync);
   }));
 
   logger.info({ jobCount: tasks.length }, 'Cron jobs started');

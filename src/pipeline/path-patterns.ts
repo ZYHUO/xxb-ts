@@ -31,10 +31,27 @@ function looksLikeMarketQuoteRequest(text: string): boolean {
   return isQueryLike(text) || REALTIME_QUALIFIER_RE.test(text);
 }
 
-export function looksLikeExternalLookupRequest(text: string): boolean {
+export function looksLikeExternalLookupRequest(text: string, recentTexts?: string[]): boolean {
   if (URL_OR_DOMAIN_RE.test(text) && INSPECT_VERB_RE.test(text)) return true;
   if (looksLikeRealtimeInfoRequest(text)) return true;
   if (looksLikeMarketQuoteRequest(text)) return true;
+  if (looksLikeSearchIntent(text)) return true;
+  // "看看这个" / "看看" with a URL in recent context (user sent URL then asked bot to look)
+  if (INSPECT_VERB_RE.test(text) && recentTexts?.some((t) => URL_OR_DOMAIN_RE.test(t))) return true;
+  return false;
+}
+
+/**
+ * Detect generic search/lookup intent in natural language.
+ * Matches patterns like "去搜一下 xxx", "帮我搜 xxx", "search for xxx", "查查 xxx 是什么" etc.
+ */
+const SEARCH_INTENT_RE = /(?:去|帮我?|你)?(?:搜一下|搜搜|搜索|查一下|查查|查找|找一下|找找|google|search|look\s*up|搜一搜|百度|bing|谷歌)\s*\S/i;
+const LOOKUP_INTENT_RE = /(?:是什么|是谁|是啥|怎么回事|什么意思|啥意思|有什么用|干什么的|干嘛的|有什么区别|区别是什么|对比一下|比较一下|评价一下|介绍一下|了解一下|科普一下)/i;
+
+function looksLikeSearchIntent(text: string): boolean {
+  if (SEARCH_INTENT_RE.test(text)) return true;
+  // "xxx 是什么/是谁" style questions that benefit from web search
+  if (LOOKUP_INTENT_RE.test(text) && QUERY_VERB_RE.test(text)) return true;
   return false;
 }
 

@@ -22,13 +22,12 @@
 ### ✨ 特性
 
 **核心 AI**
-- 🧠 **三级判断管线** — L0 本地规则 → L1 微型 AI → L2 完整 AI（扩展上下文窗口），智能决定是否回复
-- 💬 **多条回复** — AI 可一次性回复多个人（JSON 数组格式），并行发送，自动兼容单条回复
+- 🧠 **三级判断管线** — L0 本地规则 → L1 微型 AI → L2 完整 AI，智能决定是否回复
+- 💬 **多条回复** — AI 可一次性回复多个人（JSON 数组格式），自动兼容单条回复
 - 🔄 **流式回复** — 打字中效果，逐段更新消息，用户体验流畅
 - 🛠️ **工具调用** — 网页搜索（xAI Grok / SearxNG）、网页抓取、IP 查询、定时器
-- 🎯 **多模型路由** — Judge / Reply / Reply Pro / Reply Max / Vision / Summarize 分配不同模型
+- 🎯 **多模型路由** — Judge / Reply / Reply Pro / Vision / Summarize 分配不同模型
 - 🏎️ **Hedged Request** — 主模型超时自动发备用请求，谁快用谁（可关闭省 token）
-- 🧭 **Direct / Planned 双路径** — 简单消息走 direct 快速回复，复杂任务走 planned 路径（planner → tool executor → final writer）
 
 **群组功能**
 - 👥 **群成员花名册** — 自动追踪所有群成员的 username ↔ 显示名，注入 AI 上下文
@@ -36,18 +35,13 @@
 - 🚫 **智能 Bot-to-Bot 屏蔽** — 有人类在场时不和其他 bot 聊天，无人时限制 1 次回复
 - ✅ **每日签到** — `/checkin` 连续签到、排名、AI 自由发挥奖励内容
 - 📋 **群聊白名单** — 审批制入群，AI 辅助审核，Master 通知
-- 🔇 **自然语言禁言** — 说「闭嘴」「闭嘴 30 分钟」即可禁言，支持定时自动解除、直接 @bot 解除临时禁言
-- 📝 **用户偏好记忆** — 「帮我记住 xxx」「忘掉 xxx」，AI 回复时自动注入用户偏好
-- 📨 **DM 转发** — 私聊 bot 可转发消息到群聊，支持多群选择
-- 🔁 **自我反思** — 追踪回复效果（被回复/被忽略），定期 AI 总结经验教训
 
 **基础设施**
-- 📦 **BullMQ 消息队列** — Redis 支撑的高并发处理（可配置并发数），同一 chat 内 AI 生成阶段并行
+- 📦 **BullMQ 消息队列** — Redis 支撑的高并发处理（可配置并发数）
 - 🗃️ **双存储** — Redis（上下文、缓存、速率限制）+ SQLite（持久化、知识库、追踪）
-- 🧲 **ChromaDB 长期记忆** — 语义搜索，自动向量化群聊消息
 - 📊 **Admin Mini App** — Telegram WebApp HMAC 认证，运行时配置管理
-- ⏰ **Cron 定时任务** — 模型健康检查、用户画像同步、空闲主动消息、数据清理（并发保护）
-- 🔐 **安全防护** — SSRF 防护、webhook constant-time 验证、速率限制、Redis Lua 原子操作、去重锁
+- ⏰ **Cron 定时任务** — 模型健康检查、日报生成、数据清理
+- 🔐 **安全防护** — SSRF 防护、速率限制、Redis Lua 原子操作、去重锁
 
 ### 🏗️ 架构
 
@@ -59,27 +53,23 @@ grammy Bot ──→ Formatter ──→ Context (Redis)
   │                              │
   │                    Judge Pipeline (L0→L1→L2)
   │                       │              │
-  │                    IGNORE    REPLY (direct / planned)
+  │                    IGNORE    REPLY / REPLY_PRO
   │                                      │
   │                              BullMQ Queue
   │                                      │
   │                              Reply Pipeline
   │                              ├─ 4-Way Context Retrieval
-  │                              │   ├─ Recent Window
+  │                              │   ├─ Recent Window (20 msgs)
   │                              │   ├─ Thread Trace (reply chain)
   │                              │   ├─ Entity Mentions
-  │                              │   └─ Semantic (ChromaDB)
-  │                              ├─ Direct Path: 5-Layer Prompt → AI → Reply
-  │                              ├─ Planned Path: Planner → Tool Executor → Final Writer
-  │                              ├─ Multi-Reply Parser + Parallel Send
-  │                              └─ Stale Reply Suppression
+  │                              │   └─ Semantic (future)
+  │                              ├─ 5-Layer Prompt Builder
+  │                              ├─ Tool Executor (search, fetch...)
+  │                              ├─ Multi-Reply Parser
+  │                              └─ Streaming Sender
   │
-  ├─ Mute System (soft/hard/timed, auto-expire)
-  ├─ DM Relay (private → group forwarding)
   ├─ Member Registry (Redis Hash)
   ├─ Bot Interaction Tracker (SQLite)
-  ├─ User Profile Sync (AI-powered)
-  ├─ Outcome Tracker + Self-Reflection
   ├─ Rate Limiter (Redis Lua)
   ├─ Dedup Lock (Redis NX)
   └─ Allowlist Guard
@@ -87,7 +77,7 @@ grammy Bot ──→ Formatter ──→ Context (Redis)
 Hono HTTP Server
   ├─ /health
   ├─ /miniapp_api (Admin)
-  └─ /webhook (constant-time secret verification)
+  └─ /webhook (Telegram)
 ```
 
 ### 📁 项目结构
@@ -99,7 +89,7 @@ src/
 ├── admin/                # Hono Admin API + HMAC-SHA256 认证
 ├── ai/                   # AI 调用层
 │   ├── provider.ts       #   Vercel AI SDK 统一调用
-│   ├── fallback.ts       #   回退链 + hedged request (Promise.any)
+│   ├── fallback.ts       #   回退链 + hedged request
 │   ├── labels.ts         #   模型路由配置
 │   └── token-counter.ts  #   tiktoken 计算
 ├── allowlist/            # 群聊白名单 — 审批 + AI 审核
@@ -107,32 +97,26 @@ src/
 │   ├── handlers/         #   消息处理 + 成员事件
 │   ├── middleware/        #   白名单 + 速率限制
 │   └── sender/           #   流式发送 + Telegram API
-├── cache/                # 分层缓存 (LRU + Redis)
-├── cron/                 # 定时任务 (node-cron, 并发保护)
+├── cron/                 # 定时任务 (node-cron)
 ├── db/                   # Redis (ioredis) + SQLite (better-sqlite3)
-├── knowledge/            # 知识库管理 + 贴纸系统
-├── memory/               # ChromaDB 长期语义记忆
+├── knowledge/            # 知识库管理
 ├── pipeline/             # 核心消息管线
 │   ├── context/          #   上下文管理 + 压缩 + 4路检索
 │   ├── judge/            #   三级判断 (规则 + micro + full AI)
-│   ├── planner/          #   Planned 路径 (planner → executor)
 │   ├── reply/            #   回复生成 + 解析 + prompt构建
-│   ├── dm-relay/         #   DM 转发系统
 │   └── tools/            #   工具系统 (7种工具)
-├── queue/                # BullMQ 队列 + per-chat lock
+├── queue/                # BullMQ 队列
 ├── shared/               # 类型 + 日志 (pino) + 配置
-├── startup/              # 启动所有权协调 (多进程)
-└── tracking/             # 活跃度 + 用户画像 + 结果追踪 + 自我反思
+└── tracking/             # 活跃度 + 模型健康 + Bot知识 + 结果追踪
 prompts/                  # AI Prompt 模板 (Markdown)
 ├── identity/             #   人格定义
 ├── safety/               #   安全护栏
 ├── contract/             #   输出格式 (JSON Schema)
 ├── style/                #   语调风格
-├── task/                 #   任务指令 (reply, judge, planner, vision...)
+├── task/                 #   任务指令 (reply, judge, vision...)
 └── system/               #   系统级 prompt (摘要等)
-migrations/               # SQLite 迁移脚本 (0001-0011)
+migrations/               # SQLite 迁移脚本
 scripts/                  # 迁移 + 部署脚本
-tests/                    # vitest 单元测试 (38 files, 336 tests)
 ```
 
 ### 🛠️ 技术栈
@@ -257,12 +241,13 @@ Prompt 文件热缓存，修改后重启即生效，无需重新构建。
 ### 🔐 安全特性
 
 - **Telegram WebApp HMAC-SHA256 认证** — constant-time 比较防时序攻击
-- **SSRF 防护** — 私有 IP / DNS 重绑定检查
+- **SSRF 防护** — 私有 IP / DNS 重绑定检查，skill HTTP 调用同样受保护
 - **路径遍历防护** — fileUniqueId 正则校验
 - **Redis Lua 原子操作** — 速率限制 + 上下文修剪无竞态
 - **NX 去重锁** — 提交 + 结果双重去重
 - **API Key 剥离** — 前端响应永远不暴露密钥
 - **响应体限制** — web-fetch 工具 512KB 上限防内存溢出
+- **Skill 安全沙箱** — script 类型禁用（RCE 防护），HTTP skill 内置 SSRF 过滤，名称白名单校验
 
 ### 🔧 工具系统
 
@@ -278,6 +263,28 @@ Bot 可在回复时调用以下工具：
 | `LIST_TIMERS` | 列出当前定时器 |
 | `DELETE_TIMER` | 删除定时器 |
 
+### 🔌 Skill 插件系统
+
+在 `data/skills/` 目录下放置 JSON 文件即可添加自定义工具，无需修改源码：
+
+```json
+{
+  "name": "WEATHER",
+  "description": "查询指定城市的天气信息",
+  "parameters": {
+    "city": { "type": "string", "description": "城市名称" }
+  },
+  "execute": {
+    "type": "http",
+    "url": "https://wttr.in/{{city}}?format=j1",
+    "method": "GET",
+    "resultPath": "current_condition.0"
+  }
+}
+```
+
+支持 `type: "http"`（HTTP 请求，内置 SSRF 防护）。详见 `data/skills/README.md`。
+
 ---
 
 ## English
@@ -286,26 +293,20 @@ Bot 可在回复时调用以下工具：
 
 xxb-ts (啾咪囝) is a Telegram group chat AI bot written in TypeScript. It acts as an opinionated, cat-girl-themed group member that can:
 
-- **Intelligently decide** when to reply using a 3-level judge pipeline (local rules → micro AI → full AI with expanded context)
-- **Reply to multiple people** in a single trigger using JSON array output format, sent in parallel
-- **Route between direct and planned paths** — simple messages get fast direct replies, complex tasks go through planner → tool executor → final writer
+- **Intelligently decide** when to reply using a 3-level judge pipeline (local rules → micro AI → full AI)
+- **Reply to multiple people** in a single trigger using JSON array output format
 - **Call tools** — web search (xAI Grok), web fetch, IP lookup, timers
 - **Stream responses** with typing indicators and progressive message updates
-- **Mute via natural language** — users say "shut up" or "shut up for 30 minutes" for timed auto-expiring mutes
 - **Track group members** with username ↔ display name mapping, injected into AI context
 - **Learn about other bots** by recording their interactions and auto-generating knowledge digests
-- **Self-reflect** on reply effectiveness — tracks outcomes (replied-to vs ignored) and periodically generates lessons learned
-- **Handle concurrency** via BullMQ job queue backed by Redis, with per-chat locking that allows parallel AI generation
+- **Handle concurrency** via BullMQ job queue backed by Redis
 
 ### Key Design Decisions
 
 - **AI-provider agnostic** — Uses [Vercel AI SDK](https://sdk.vercel.ai/) with OpenAI-compatible endpoints. Works with OpenAI, Google Gemini, Anthropic, or any compatible proxy.
 - **Dual storage** — Redis for hot data (context, rate limits, member registry) + SQLite for cold data (knowledge, tracking, checkins).
-- **Long-term memory** — ChromaDB for semantic search over past conversations.
 - **5-layer prompt system** — Identity, Safety, Contract (JSON Schema), Style, and Task layers compose the system prompt. All prompts are Markdown files, editable without rebuilding.
-- **4-way context retrieval** — Recent window + reply thread trace + entity mentions + semantic search (ChromaDB), merged and token-budget-capped.
-- **Dual reply paths** — Direct path for fast simple replies, Planned path (planner → tool executor → final writer) for complex tasks requiring tools.
-- **Hedged requests** — Primary + backup model race via `Promise.any`, preserving original errors on failure.
+- **4-way context retrieval** — Recent window + reply thread trace + entity mentions + semantic search (future), merged and token-budget-capped.
 - **Graceful shutdown** — BullMQ worker drains active jobs before the bot instance is destroyed.
 
 ### Quick Start
