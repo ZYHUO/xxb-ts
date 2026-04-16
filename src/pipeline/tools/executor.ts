@@ -6,8 +6,7 @@
 import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { buildToolSet } from './registry.js';
-import { getRedis } from '../../db/redis.js';
-import { loadOverride, resolveLabelForRuntime, resolveUsageForRuntime } from '../../admin/runtime-config.js';
+import { getUsage, getLabel } from '../../ai/labels.js';
 import { logger } from '../../shared/logger.js';
 import type { AICallResult } from '../../ai/types.js';
 
@@ -21,9 +20,8 @@ export async function generateWithTools(
   opts?: { temperatureOverride?: number },
 ): Promise<AICallResult & { toolsUsed: string[] }> {
   const start = performance.now();
-  const override = await loadOverride(getRedis()).catch(() => null);
-  const usageConfig = resolveUsageForRuntime(usage, override);
-  const label = resolveLabelForRuntime(usageConfig.label, override);
+  const usageConfig = getUsage(usage);
+  const label = getLabel(usageConfig.label);
   const tools = buildToolSet(chatId, userId);
 
   const provider = createOpenAI({

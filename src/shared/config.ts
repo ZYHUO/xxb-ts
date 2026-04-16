@@ -44,6 +44,42 @@ export function getConfig(): AppConfig {
 
 export { loadPrompt };
 
+const PROMPT_CACHE_MAX_SIZE = 200;
+const PROMPT_CACHE_EVICT_COUNT = 50;
+
+let _promptCache: Map<string, string> | undefined;
+
+function getPromptCache(): Map<string, string> {
+  if (!_promptCache) {
+    _promptCache = new Map();
+  }
+  return _promptCache;
+}
+
+export function loadCachedPrompt(relativePath: string): string {
+  const cache = getPromptCache();
+  const cached = cache.get(relativePath);
+  if (cached !== undefined) return cached;
+
+  const config = getConfig();
+  const content = loadPrompt(relativePath, config.promptsDir);
+  cache.set(relativePath, content);
+  if (cache.size > PROMPT_CACHE_MAX_SIZE) {
+    const keys = cache.keys();
+    for (let i = 0; i < PROMPT_CACHE_EVICT_COUNT; i++) {
+      const { value, done } = keys.next();
+      if (done) break;
+      cache.delete(value);
+    }
+  }
+  return content;
+}
+
+/** Reset prompt cache (for testing) */
+export function _resetPromptCache(): void {
+  _promptCache = undefined;
+}
+
 /** @internal test helper — clears cached AppConfig */
 export function _resetAppConfig(): void {
   _config = undefined;

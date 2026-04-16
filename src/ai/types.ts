@@ -8,6 +8,7 @@ export interface AILabel {
   apiKeys: string[];
   model: string;
   stream?: boolean;
+  apiFormat?: 'openai' | 'claude';
   capabilities?: { vision?: boolean; functionCalling?: boolean };
 }
 

@@ -9,6 +9,7 @@ import { logger } from '../../shared/logger.js';
 
 const CTX_PREFIX = 'xxb:ctx:';
 const MEMBERS_PREFIX = 'xxb:members:';
+const USER_GROUPS_PREFIX = 'xxb:user:groups:';
 const TRUNCATE_SIZE = 50;
 const MEMBERS_TTL = 30 * 86400; // 30 days
 const CTX_TTL = 7 * 86400; // 7 days rolling TTL
@@ -56,6 +57,13 @@ export async function addMessage(chatId: number, message: FormattedMessage): Pro
       });
       await redis.hset(memberKey, String(message.uid), memberData);
       await redis.expire(memberKey, MEMBERS_TTL);
+
+      // Reverse index: track which groups this user belongs to
+      if (chatId < 0) {
+        const userGroupsKey = USER_GROUPS_PREFIX + message.uid;
+        await redis.sadd(userGroupsKey, String(chatId));
+        await redis.expire(userGroupsKey, MEMBERS_TTL);
+      }
     } catch (err) {
       logger.debug({ err, chatId }, 'Member tracking failed (non-critical)');
     }
@@ -66,11 +74,6 @@ export async function getRecent(chatId: number, count: number): Promise<Formatte
   const redis = getRedis();
   const raw = await redis.lrange(ctxKey(chatId), -count, -1);
   return raw.map((r) => JSON.parse(r) as FormattedMessage);
-}
-
-/** Fetch a specific number of recent messages (for activity estimation, separate from judge window) */
-export async function getRecentCount(chatId: number, count: number): Promise<FormattedMessage[]> {
-  return getRecent(chatId, count);
 }
 
 export async function getAll(chatId: number): Promise<FormattedMessage[]> {
@@ -114,4 +117,11 @@ export async function getGroupMembers(chatId: number): Promise<GroupMember[]> {
   // Sort by last seen (most recent first)
   members.sort((a, b) => b.lastSeen - a.lastSeen);
   return members;
+}
+
+/** Get all group chatIds a user has been seen in (reverse index) */
+export async function getUserGroups(uid: number): Promise<number[]> {
+  const redis = getRedis();
+  const raw = await redis.smembers(USER_GROUPS_PREFIX + uid);
+  return raw.map(Number).filter((n) => !Number.isNaN(n));
 }

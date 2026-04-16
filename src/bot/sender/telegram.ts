@@ -117,8 +117,16 @@ export async function sendSticker(
 }
 
 /**
- * Send a chat action (e.g., 'typing').
+ * Delete a message. Fails silently if already deleted or not found.
  */
+export async function deleteMessage(chatId: number, messageId: number): Promise<void> {
+  try {
+    const bot = getBot();
+    await bot.api.deleteMessage(chatId, messageId);
+  } catch (err) {
+    logger.warn({ chatId, messageId, err }, 'deleteMessage failed (non-critical)');
+  }
+}
 export async function sendChatAction(
   chatId: number,
   action: 'typing' | 'upload_photo' | 'record_voice',

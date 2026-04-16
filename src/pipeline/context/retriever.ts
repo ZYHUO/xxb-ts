@@ -10,11 +10,12 @@
 import type { FormattedMessage, RetrievedContext } from '../../shared/types.js';
 import { getRecent, getAll } from './manager.js';
 import { countTokens } from '../../ai/token-counter.js';
-import { slimContextForAI } from './slim.js';
+import { slimContextForAI, slimSingleMessage } from './slim.js';
 import { searchMemory } from '../../memory/chroma.js';
 import { logger } from '../../shared/logger.js';
 
 export interface RetrieverConfig {
+  mode: 'direct' | 'planned';
   recentWindow: number;
   semanticTopK: number;
   threadMaxDepth: number;
@@ -23,18 +24,20 @@ export interface RetrieverConfig {
 }
 
 const DEFAULT_CONFIG: RetrieverConfig = {
-  recentWindow: 20,
+  mode: 'planned',
+  recentWindow: 50,
   semanticTopK: 10,
   threadMaxDepth: 8,
   entityMaxMessages: 5,
-  totalTokenBudget: 1500,
+  totalTokenBudget: 48_000,
 };
 
 /**
  * Path 1: Recent window — last N messages from context.
  */
 async function retrieveRecent(chatId: number, count: number): Promise<FormattedMessage[]> {
-  return getRecent(chatId, count);
+  const recent = await getRecent(chatId, count);
+  return [...recent].sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**
@@ -56,10 +59,10 @@ async function retrieveThread(
   chatId: number,
   message: FormattedMessage,
   maxDepth: number,
+  allMessages: FormattedMessage[],
 ): Promise<FormattedMessage[]> {
   if (!message.replyTo) return [];
 
-  const allMessages = await getAll(chatId);
   const byId = new Map<number, FormattedMessage>();
   for (const m of allMessages) {
     byId.set(m.messageId, m);
@@ -90,6 +93,7 @@ async function retrieveEntity(
   chatId: number,
   message: FormattedMessage,
   maxMessages: number,
+  allMessages: FormattedMessage[],
 ): Promise<FormattedMessage[]> {
   const text = message.textContent || message.captionContent || '';
   const mentions = text.match(/@(\w+)/g);
@@ -99,7 +103,6 @@ async function retrieveEntity(
     mentions.map((m) => m.slice(1).toLowerCase()),
   );
 
-  const allMessages = await getAll(chatId);
   const entityMessages: FormattedMessage[] = [];
 
   for (let i = allMessages.length - 1; i >= 0 && entityMessages.length < maxMessages; i--) {
@@ -130,32 +133,29 @@ function deduplicateMessages(messages: FormattedMessage[]): FormattedMessage[] {
   return result;
 }
 
-/**
- * Truncate messages to fit within token budget.
- * Priority: thread > recent > semantic > entity
- */
-function truncateToTokenBudget(
-  merged: FormattedMessage[],
+function appendExtrasWithinBudget(
+  baseMessages: FormattedMessage[],
+  extraMessages: FormattedMessage[],
   currentMessage: FormattedMessage,
   botUid: number,
   tokenBudget: number,
 ): FormattedMessage[] {
-  if (merged.length === 0) return merged;
+  const result = [...baseMessages];
+  const seen = new Set(baseMessages.map((msg) => msg.messageId));
+  let currentTokens = countTokens(slimContextForAI(result, currentMessage, botUid));
 
-  // Check if already within budget
-  const fullContext = slimContextForAI(merged, currentMessage, botUid);
-  const fullTokens = countTokens(fullContext);
-
-  if (fullTokens <= tokenBudget) return merged;
-
-  // Trim from the beginning (oldest messages first)
-  const result = [...merged];
-  while (result.length > 1) {
-    result.shift();
-    const ctx = slimContextForAI(result, currentMessage, botUid);
-    if (countTokens(ctx) <= tokenBudget) break;
+  const sortedExtras = [...extraMessages].sort((a, b) => a.timestamp - b.timestamp);
+  for (const extra of sortedExtras) {
+    if (seen.has(extra.messageId)) continue;
+    // Estimate incremental token cost of this single message
+    const extraTokens = countTokens(slimSingleMessage(extra, botUid));
+    if (currentTokens + extraTokens > tokenBudget) continue;
+    result.push(extra);
+    seen.add(extra.messageId);
+    currentTokens += extraTokens;
   }
 
+  result.sort((a, b) => a.timestamp - b.timestamp);
   return result;
 }
 
@@ -171,32 +171,87 @@ export async function retrieveContext(
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const queryText = message.textContent || message.captionContent || '';
 
+  if (cfg.mode === 'direct') {
+    const recent = await retrieveRecent(chatId, cfg.recentWindow);
+    const semantic: typeof recent = [];
+    const merged = recent;
+    const contextStr = slimContextForAI(merged, message, botUid);
+    const tokenCount = countTokens(contextStr);
+
+    logger.debug({
+      chatId,
+      mode: cfg.mode,
+      recent: recent.length,
+      semantic: semantic.length,
+      thread: 0,
+      entity: 0,
+      merged: merged.length,
+      tokenCount,
+    }, 'Context retrieved');
+
+    return {
+      recent,
+      semantic,
+      thread: [],
+      entity: [],
+      merged,
+      tokenCount,
+    };
+  }
+
   // Run recent first; if it already fills the token budget, skip the expensive semantic fetch
   const recent = await retrieveRecent(chatId, cfg.recentWindow);
   const recentContextStr = slimContextForAI(recent, message, botUid);
-  const skipSemantic = countTokens(recentContextStr) >= cfg.totalTokenBudget;
+  const recentTokens = countTokens(recentContextStr);
+  const skipExtras = recentTokens >= cfg.totalTokenBudget;
 
-  // Thread and entity are cheap local SQLite reads — always run in parallel
+  if (skipExtras) {
+    logger.debug({
+      chatId,
+      mode: cfg.mode,
+      recent: recent.length,
+      semantic: 0,
+      thread: 0,
+      entity: 0,
+      merged: recent.length,
+      tokenCount: recentTokens,
+    }, 'Context retrieved');
+
+    return {
+      recent,
+      semantic: [],
+      thread: [],
+      entity: [],
+      merged: recent,
+      tokenCount: recentTokens,
+    };
+  }
+
+  // Thread and entity need full message list — only fetch if needed
+  const needsAllMessages = !!message.replyTo || (queryText.match(/@\w+/g) ?? []).length > 0;
+  const allMessages = needsAllMessages ? await getAll(chatId) : [];
+
   const [semantic, thread, entity] = await Promise.all([
-    skipSemantic ? Promise.resolve([] as FormattedMessage[]) : retrieveSemantic(chatId, queryText, cfg.semanticTopK),
-    retrieveThread(chatId, message, cfg.threadMaxDepth),
-    retrieveEntity(chatId, message, cfg.entityMaxMessages),
+    retrieveSemantic(chatId, queryText, cfg.semanticTopK),
+    retrieveThread(chatId, message, cfg.threadMaxDepth, allMessages),
+    retrieveEntity(chatId, message, cfg.entityMaxMessages, allMessages),
   ]);
 
   // Merge with priority: thread > recent > semantic > entity
-  const allMessages = [...thread, ...recent, ...semantic, ...entity];
-  const deduped = deduplicateMessages(allMessages);
+  const allMerged = [...thread, ...recent, ...semantic, ...entity];
+  const deduped = deduplicateMessages(allMerged);
 
   // Sort by timestamp
   deduped.sort((a, b) => a.timestamp - b.timestamp);
 
   // Truncate to token budget
-  const merged = truncateToTokenBudget(deduped, message, botUid, cfg.totalTokenBudget);
+  const merged = appendExtrasWithinBudget(recent, deduped, message, botUid, cfg.totalTokenBudget);
   const contextStr = slimContextForAI(merged, message, botUid);
   const tokenCount = countTokens(contextStr);
 
   logger.debug({
     chatId,
+    mode: cfg.mode,
     recent: recent.length,
     semantic: semantic.length,
     thread: thread.length,

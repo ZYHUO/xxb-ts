@@ -10,6 +10,7 @@ import { runModelCheck } from './model-check.js';
 import { runCleanup, type CleanupDeps } from './cleanup.js';
 import { runKnowledgeSync } from './knowledge-sync.js';
 import { runUserProfileSync } from '../tracking/user-profile.js';
+import { runIdleCheck } from './idle.js';
 import { logger } from '../shared/logger.js';
 
 export interface CronDeps {
@@ -63,6 +64,11 @@ export function startCronJobs(deps?: CronDeps): void {
     void safeRun('user-profile-sync', runUserProfileSync);
   }));
 
+  // Idle proactive messaging — every 5 minutes, poke silent group chats
+  tasks.push(schedule('*/5 * * * *', () => {
+    void safeRun('idle-check', runIdleCheck);
+  }));
+
   logger.info({ jobCount: tasks.length }, 'Cron jobs started');
 }
 
@@ -79,7 +85,14 @@ export function isStarted(): boolean {
   return _started;
 }
 
+const _running = new Set<string>();
+
 async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
+  if (_running.has(name)) {
+    logger.warn({ name }, 'Cron job already running, skipping');
+    return;
+  }
+  _running.add(name);
   const start = performance.now();
   try {
     await fn();
@@ -88,5 +101,7 @@ async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
   } catch (err) {
     const durationMs = Math.round(performance.now() - start);
     logger.error({ err, name, durationMs }, 'Cron job failed');
+  } finally {
+    _running.delete(name);
   }
 }

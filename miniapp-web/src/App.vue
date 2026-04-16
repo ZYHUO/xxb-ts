@@ -455,45 +455,6 @@ async function runAdminAction(key, action, payload, successMessage) {
   }
 }
 
-async function saveModelRouting(payload) {
-  state.modelRoutingBusy = true;
-  state.adminMessage = '';
-  try {
-    const res = await request('model_routing_save', payload);
-    if (state.boot) state.boot.model_routing = res.model_routing ?? state.boot.model_routing;
-    state.adminTone = 'success';
-    state.adminMessage = '模型路由已保存。';
-    haptic('notification', 'success');
-    await onAdminRefresh();
-  } catch (error) {
-    state.adminTone = 'danger';
-    state.adminMessage = mapError(error);
-    haptic('notification', 'error');
-  } finally {
-    state.modelRoutingBusy = false;
-  }
-}
-
-async function upsertProvider(payload) {
-  state.modelRoutingBusy = true;
-  state.adminMessage = '';
-  state.providerValidationResult = null;
-  try {
-    const res = await request('provider_upsert', payload);
-    if (state.boot) state.boot.model_routing = res.model_routing ?? state.boot.model_routing;
-    state.adminTone = 'success';
-    state.adminMessage = 'Provider 已保存。';
-    haptic('notification', 'success');
-    await onAdminRefresh();
-  } catch (error) {
-    state.adminTone = 'danger';
-    state.adminMessage = mapError(error);
-    haptic('notification', 'error');
-  } finally {
-    state.modelRoutingBusy = false;
-  }
-}
-
 async function validateProvider(payload) {
   state.modelRoutingBusy = true;
   state.adminMessage = '';
@@ -780,8 +741,6 @@ onUnmounted(() => {
         :model-routing="modelRouting"
         :busy="state.modelRoutingBusy"
         :validation-result="state.providerValidationResult"
-        @save-routing="saveModelRouting"
-        @upsert-provider="upsertProvider"
         @validate-provider="validateProvider"
       />
 

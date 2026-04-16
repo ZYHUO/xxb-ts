@@ -1,0 +1,598 @@
+WARNING:  [10-04-2026 17:05:35] chroma_server_nofile is set to 65535, but this is less than current soft limit of 1048576. chroma_server_nofile will not be set.
+INFO:     [10-04-2026 17:05:36] Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+DEBUG:    [10-04-2026 17:05:36] Starting component System
+DEBUG:    [10-04-2026 17:05:36] Starting component OpenTelemetryClient
+DEBUG:    [10-04-2026 17:05:36] Starting component SqliteDB
+DEBUG:    [10-04-2026 17:05:37] Starting component SimpleQuotaEnforcer
+DEBUG:    [10-04-2026 17:05:37] Starting component Posthog
+DEBUG:    [10-04-2026 17:05:37] Starting component SimpleRateLimitEnforcer
+DEBUG:    [10-04-2026 17:05:37] Starting component LocalSegmentManager
+DEBUG:    [10-04-2026 17:05:37] Starting component LocalExecutor
+DEBUG:    [10-04-2026 17:05:37] Starting component SegmentAPI
+DEBUG:    [10-04-2026 17:05:37] Starting component SimpleAsyncRateLimitEnforcer
+ERROR:    [10-04-2026 17:05:37] Failed to send telemetry event ServerStartEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:05:37] Started server process [1983735]
+INFO:     [10-04-2026 17:05:37] Waiting for application startup.
+INFO:     [10-04-2026 17:05:37] Application startup complete.
+INFO:     [10-04-2026 17:05:37] Uvicorn running on http://localhost:8400 (Press CTRL+C to quit)
+INFO:     [10-04-2026 17:05:45] 127.0.0.1:39590 - "GET /api/v1/heartbeat HTTP/1.1" 200
+INFO:     [10-04-2026 17:05:55] Shutting down
+INFO:     [10-04-2026 17:05:55] Waiting for application shutdown.
+DEBUG:    [10-04-2026 17:05:55] Stopping component System
+DEBUG:    [10-04-2026 17:05:55] Stopping component SegmentAPI
+DEBUG:    [10-04-2026 17:05:55] Stopping component LocalExecutor
+DEBUG:    [10-04-2026 17:05:55] Stopping component LocalSegmentManager
+DEBUG:    [10-04-2026 17:05:55] Stopping component SimpleAsyncRateLimitEnforcer
+DEBUG:    [10-04-2026 17:05:55] Stopping component SimpleRateLimitEnforcer
+DEBUG:    [10-04-2026 17:05:55] Stopping component Posthog
+DEBUG:    [10-04-2026 17:05:55] Stopping component SimpleQuotaEnforcer
+DEBUG:    [10-04-2026 17:05:55] Stopping component SqliteDB
+DEBUG:    [10-04-2026 17:05:55] Stopping component OpenTelemetryClient
+INFO:     [10-04-2026 17:05:55] Application shutdown complete.
+INFO:     [10-04-2026 17:05:55] Finished server process [1983735]
+WARNING:  [10-04-2026 17:06:49] chroma_server_nofile is set to 65535, but this is less than current soft limit of 1048576. chroma_server_nofile will not be set.
+INFO:     [10-04-2026 17:06:50] Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+DEBUG:    [10-04-2026 17:06:50] Starting component System
+DEBUG:    [10-04-2026 17:06:50] Starting component OpenTelemetryClient
+DEBUG:    [10-04-2026 17:06:50] Starting component SqliteDB
+DEBUG:    [10-04-2026 17:06:50] Starting component SimpleQuotaEnforcer
+DEBUG:    [10-04-2026 17:06:50] Starting component Posthog
+DEBUG:    [10-04-2026 17:06:50] Starting component SimpleRateLimitEnforcer
+DEBUG:    [10-04-2026 17:06:50] Starting component LocalSegmentManager
+DEBUG:    [10-04-2026 17:06:50] Starting component LocalExecutor
+DEBUG:    [10-04-2026 17:06:50] Starting component SegmentAPI
+DEBUG:    [10-04-2026 17:06:50] Starting component SimpleAsyncRateLimitEnforcer
+ERROR:    [10-04-2026 17:06:50] Failed to send telemetry event ServerStartEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:06:50] Started server process [1984592]
+INFO:     [10-04-2026 17:06:50] Waiting for application startup.
+INFO:     [10-04-2026 17:06:50] Application startup complete.
+INFO:     [10-04-2026 17:06:50] Uvicorn running on http://localhost:8400 (Press CTRL+C to quit)
+INFO:     [10-04-2026 17:07:00] 127.0.0.1:35844 - "GET /api/v1/heartbeat HTTP/1.1" 200
+INFO:     [10-04-2026 17:07:22] 127.0.0.1:49922 - "GET /api/v2/heartbeat HTTP/1.1" 200
+ERROR:    [10-04-2026 17:07:22] '_type'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/server/fastapi/__init__.py", line 120, in catch_exceptions_middleware
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/server/fastapi/__init__.py", line 144, in check_http_version_middleware
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/exceptions.py", line 79, in __call__
+    raise exc
+  File "/usr/local/lib/python3.12/dist-packages/starlette/middleware/exceptions.py", line 68, in __call__
+    await self.app(scope, receive, sender)
+  File "/usr/local/lib/python3.12/dist-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.12/dist-packages/starlette/routing.py", line 718, in __call__
+    await route.handle(scope, receive, send)
+  File "/usr/local/lib/python3.12/dist-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.12/dist-packages/starlette/routing.py", line 66, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/fastapi/routing.py", line 273, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/fastapi/routing.py", line 190, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/telemetry/opentelemetry/__init__.py", line 134, in async_wrapper
+    return await f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/server/fastapi/__init__.py", line 798, in create_collection
+    await to_thread.run_sync(
+  File "/usr/local/lib/python3.12/dist-packages/anyio/to_thread.py", line 33, in run_sync
+    return await get_asynclib().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/anyio/_backends/_asyncio.py", line 877, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/anyio/_backends/_asyncio.py", line 807, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/server/fastapi/__init__.py", line 772, in process_create_collection
+    else CollectionConfigurationInternal.from_json(create.configuration)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/chromadb/api/configuration.py", line 209, in from_json
+    f"Trying to instantiate configuration of type {cls.__name__} from JSON with type {json_map['_type']}"
+                                                                                      ~~~~~~~~^^^^^^^^^
+KeyError: '_type'
+INFO:     [10-04-2026 17:07:22] 127.0.0.1:49932 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 500
+ERROR:    [10-04-2026 17:07:33] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:07:33] 127.0.0.1:34434 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 17:07:33] 127.0.0.1:34440 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+DEBUG:    [10-04-2026 17:07:33] Starting component PersistentLocalHnswSegment
+INFO:     [10-04-2026 17:07:33] 127.0.0.1:34434 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/9cf145c8-23ed-4d85-8cd5-1f2ec0402c7c/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:07:33] 127.0.0.1:34440 - "GET /api/v2/tenants/default_tenant/databases/default_database/collections/9cf145c8-23ed-4d85-8cd5-1f2ec0402c7c/count HTTP/1.1" 200
+ERROR:    [10-04-2026 17:07:33] Failed to send telemetry event CollectionQueryEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:07:33] 127.0.0.1:34434 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/9cf145c8-23ed-4d85-8cd5-1f2ec0402c7c/query HTTP/1.1" 200
+ERROR:    [10-04-2026 17:08:04] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:08:04] 127.0.0.1:46932 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 17:08:04] 127.0.0.1:46942 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+ERROR:    [10-04-2026 17:11:18] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:11:18] 127.0.0.1:34790 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 17:11:18] 127.0.0.1:34790 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+DEBUG:    [10-04-2026 17:11:18] Starting component PersistentLocalHnswSegment
+INFO:     [10-04-2026 17:11:18] 127.0.0.1:34798 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:12:57] 127.0.0.1:45090 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:13:04] 127.0.0.1:41202 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:13:20] 127.0.0.1:50108 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:13:48] 127.0.0.1:56400 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:14:44] 127.0.0.1:45956 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:15:25] 127.0.0.1:42264 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:15:37] 127.0.0.1:58948 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:15:48] 127.0.0.1:44350 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:15:49] 127.0.0.1:44350 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:15:53] 127.0.0.1:44350 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:00] 127.0.0.1:48968 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:04] 127.0.0.1:48968 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:08] 127.0.0.1:58354 - "GET /api/v2/heartbeat HTTP/1.1" 200
+DEBUG:    [10-04-2026 17:16:10] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 17:16:10] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:16:10] 127.0.0.1:58354 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:10] 127.0.0.1:58354 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:10] 127.0.0.1:58366 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:10] 127.0.0.1:58378 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:10] 127.0.0.1:58354 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:19] 127.0.0.1:38282 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:21] 127.0.0.1:38282 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:28] 127.0.0.1:33846 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:30] 127.0.0.1:33846 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:31] 127.0.0.1:33846 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:36] 127.0.0.1:38578 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:39] 127.0.0.1:38578 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:44] 127.0.0.1:57868 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:16:48] 127.0.0.1:57876 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:08] 127.0.0.1:39826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:08] 127.0.0.1:39834 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:08] 127.0.0.1:39832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:08] 127.0.0.1:39826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:15] 127.0.0.1:36590 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:25] 127.0.0.1:41326 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:33] 127.0.0.1:56988 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:50] 127.0.0.1:47190 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:52] 127.0.0.1:47190 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:17:56] 127.0.0.1:47190 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:04] 127.0.0.1:56400 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:08] 127.0.0.1:56400 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:15] 127.0.0.1:40356 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:20] 127.0.0.1:40372 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:29] 127.0.0.1:38950 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:30] 127.0.0.1:38950 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:33] 127.0.0.1:38950 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:39] 127.0.0.1:56452 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:43] 127.0.0.1:56452 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:45] 127.0.0.1:56452 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:48] 127.0.0.1:56452 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:54] 127.0.0.1:34634 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:18:58] 127.0.0.1:34640 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:01] 127.0.0.1:34640 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:07] 127.0.0.1:44756 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:10] 127.0.0.1:44756 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:16] 127.0.0.1:47726 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:20] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:22] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:25] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:26] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:27] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:27] 127.0.0.1:47740 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:36] 127.0.0.1:32814 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:48] 127.0.0.1:49532 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:19:54] 127.0.0.1:45678 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:06] 127.0.0.1:52114 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:10] 127.0.0.1:52118 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:26] 127.0.0.1:53648 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:32] 127.0.0.1:39726 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:34] 127.0.0.1:39726 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:44] 127.0.0.1:51134 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:20:56] 127.0.0.1:56716 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:07] 127.0.0.1:51574 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:12] 127.0.0.1:51402 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:15] 127.0.0.1:51402 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:17] 127.0.0.1:51402 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:30] 127.0.0.1:38682 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:36] 127.0.0.1:47410 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:37] 127.0.0.1:47410 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:41] 127.0.0.1:47410 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:47] 127.0.0.1:59718 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:55] 127.0.0.1:45188 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:58] 127.0.0.1:45188 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:21:59] 127.0.0.1:45188 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:22:19] 127.0.0.1:52414 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:22:46] 127.0.0.1:50938 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:23:18] 127.0.0.1:52908 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:23:22] 127.0.0.1:46350 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:23:55] 127.0.0.1:56180 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:02] 127.0.0.1:35182 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:03] 127.0.0.1:35182 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:05] 127.0.0.1:35182 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:17] 127.0.0.1:55304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:20] 127.0.0.1:55304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:22] 127.0.0.1:55304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:37] 127.0.0.1:35956 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:24:57] 127.0.0.1:33346 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:04] 127.0.0.1:36218 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:09] 127.0.0.1:36226 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:11] 127.0.0.1:36226 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:16] 127.0.0.1:38618 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:27] 127.0.0.1:50948 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:27] 127.0.0.1:50948 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:36] 127.0.0.1:43138 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:41] 127.0.0.1:48128 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:48] 127.0.0.1:48144 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:51] 127.0.0.1:48144 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:25:53] 127.0.0.1:48144 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:05] 127.0.0.1:41088 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:12] 127.0.0.1:39686 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:14] 127.0.0.1:39686 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:17] 127.0.0.1:39686 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:38] 127.0.0.1:44826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:26:44] 127.0.0.1:55806 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:27:18] 127.0.0.1:35002 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:27:32] 127.0.0.1:33766 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:27:35] 127.0.0.1:33766 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:27:46] 127.0.0.1:47652 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:00] 127.0.0.1:42832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:01] 127.0.0.1:42832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:03] 127.0.0.1:42832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:10] 127.0.0.1:56898 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:14] 127.0.0.1:56898 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:18] 127.0.0.1:56898 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:27] 127.0.0.1:55960 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:28] 127.0.0.1:55960 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:33] 127.0.0.1:42996 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:35] 127.0.0.1:42996 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:37] 127.0.0.1:42996 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:44] 127.0.0.1:34332 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:50] 127.0.0.1:34346 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:52] 127.0.0.1:34346 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:28:55] 127.0.0.1:34346 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:01] 127.0.0.1:39614 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:01] 127.0.0.1:39614 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:24] 127.0.0.1:51570 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:25] 127.0.0.1:51570 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:25] 127.0.0.1:51570 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:27] 127.0.0.1:51570 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:28] 127.0.0.1:51570 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:42] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:45] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:48] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:49] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:51] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:29:52] 127.0.0.1:44034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:05] 127.0.0.1:50792 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:08] 127.0.0.1:50792 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:15] 127.0.0.1:41646 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:27] 127.0.0.1:55724 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:28] 127.0.0.1:55724 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:34] 127.0.0.1:60842 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:43] 127.0.0.1:40668 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:30:44] 127.0.0.1:40680 - "GET /api/v2/heartbeat HTTP/1.1" 200
+DEBUG:    [10-04-2026 17:31:08] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 17:31:08] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:31:08] 127.0.0.1:54612 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:08] 127.0.0.1:54612 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:08] 127.0.0.1:54626 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:15] 127.0.0.1:48878 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:17] 127.0.0.1:48878 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:26] 127.0.0.1:50828 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:32] 127.0.0.1:58340 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:56] 127.0.0.1:34712 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:31:56] 127.0.0.1:34712 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:32:01] 127.0.0.1:45954 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:32:12] 127.0.0.1:44698 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:32:46] 127.0.0.1:59042 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:32:50] 127.0.0.1:59054 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:06] 127.0.0.1:55428 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+DEBUG:    [10-04-2026 17:33:51] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 17:33:51] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:33:51] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+ERROR:    [10-04-2026 17:33:52] Failed to send telemetry event CollectionQueryEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44592 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44592 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44592 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44592 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:33:52] 127.0.0.1:44588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 17:34:58] 127.0.0.1:40264 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:35:15] 127.0.0.1:39152 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:35:20] 127.0.0.1:39162 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:35:48] 127.0.0.1:48768 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:36:09] 127.0.0.1:36514 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:37:18] 127.0.0.1:57218 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:37:38] 127.0.0.1:57996 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:37:49] 127.0.0.1:36050 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:38:46] 127.0.0.1:59396 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:38:50] 127.0.0.1:59396 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:38:57] 127.0.0.1:36090 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:05] 127.0.0.1:38032 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:13] 127.0.0.1:41692 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:15] 127.0.0.1:41692 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:20] 127.0.0.1:41696 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:22] 127.0.0.1:41696 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:25] 127.0.0.1:41696 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:39:29] 127.0.0.1:56510 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:40:16] 127.0.0.1:50344 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:40:42] 127.0.0.1:49866 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:40:45] 127.0.0.1:49866 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:40:52] 127.0.0.1:56734 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:40:53] 127.0.0.1:56734 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:21] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:23] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:23] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:23] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:23] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:23] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:24] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:24] 127.0.0.1:55714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:41:35] 127.0.0.1:38018 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:42:38] 127.0.0.1:59442 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:43:15] 127.0.0.1:36116 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:43:19] 127.0.0.1:36130 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:43:31] 127.0.0.1:33420 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:43:31] 127.0.0.1:33420 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:44:05] 127.0.0.1:53126 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:44:14] 127.0.0.1:53586 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:45:25] 127.0.0.1:49064 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:46:14] 127.0.0.1:54352 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:47:00] 127.0.0.1:39576 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:47:01] 127.0.0.1:39576 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:47:07] 127.0.0.1:52312 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:47:07] 127.0.0.1:52312 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:48:04] 127.0.0.1:40136 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:48:27] 127.0.0.1:54950 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:50:47] 127.0.0.1:34048 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:51:01] 127.0.0.1:42094 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:51:19] 127.0.0.1:55004 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:51:31] 127.0.0.1:40400 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:51:41] 127.0.0.1:42518 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:51:54] 127.0.0.1:37782 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:52:29] 127.0.0.1:49426 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:52:44] 127.0.0.1:34388 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:53:51] 127.0.0.1:59316 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:09] 127.0.0.1:48332 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:14] 127.0.0.1:47350 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:20] 127.0.0.1:47354 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:28] 127.0.0.1:49504 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:33] 127.0.0.1:41316 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:54:35] 127.0.0.1:41316 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:03] 127.0.0.1:52458 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:19] 127.0.0.1:50662 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:25] 127.0.0.1:53248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:29] 127.0.0.1:53248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:30] 127.0.0.1:53248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:32] 127.0.0.1:53248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:44] 127.0.0.1:42440 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:55:53] 127.0.0.1:33240 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:56:07] 127.0.0.1:36700 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:56:10] 127.0.0.1:36700 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:56:12] 127.0.0.1:36700 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:56:20] 127.0.0.1:42886 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:56:25] 127.0.0.1:44250 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:57:38] 127.0.0.1:41124 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:57:43] 127.0.0.1:34420 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:07] 127.0.0.1:53422 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:12] 127.0.0.1:35134 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:38] 127.0.0.1:53230 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:39] 127.0.0.1:53230 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:46] 127.0.0.1:54942 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:50] 127.0.0.1:54942 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:56] 127.0.0.1:54334 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:58:58] 127.0.0.1:54334 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:03] 127.0.0.1:44234 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:14] 127.0.0.1:52792 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:32] 127.0.0.1:33916 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:49] 127.0.0.1:33304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:51] 127.0.0.1:33304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:53] 127.0.0.1:33304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 17:59:53] 127.0.0.1:33304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:07] 127.0.0.1:60714 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:12] 127.0.0.1:54800 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:12] 127.0.0.1:54800 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:26] 127.0.0.1:33198 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:32] 127.0.0.1:50856 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:35] 127.0.0.1:50856 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:42] 127.0.0.1:49702 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:44] 127.0.0.1:49702 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:47] 127.0.0.1:49702 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:49] 127.0.0.1:49702 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:00:50] 127.0.0.1:49702 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:00] 127.0.0.1:40244 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:01] 127.0.0.1:40244 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:04] 127.0.0.1:40244 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:22] 127.0.0.1:56538 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:24] 127.0.0.1:56538 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:36] 127.0.0.1:55842 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:36] 127.0.0.1:55842 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:42] 127.0.0.1:34368 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:01:59] 127.0.0.1:60720 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:02] 127.0.0.1:60720 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:03] 127.0.0.1:60720 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:05] 127.0.0.1:60720 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:08] 127.0.0.1:60720 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:13] 127.0.0.1:50194 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:17] 127.0.0.1:50194 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:30] 127.0.0.1:49668 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:02:38] 127.0.0.1:40524 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:03:27] 127.0.0.1:54466 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:03:59] 127.0.0.1:38088 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:07] 127.0.0.1:40664 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:10] 127.0.0.1:40664 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:18] 127.0.0.1:48762 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:23] 127.0.0.1:48332 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:39] 127.0.0.1:56062 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:43] 127.0.0.1:57836 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:46] 127.0.0.1:57836 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:04:58] 127.0.0.1:50322 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:13] 127.0.0.1:51100 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:14] 127.0.0.1:51100 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:20] 127.0.0.1:51114 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:33] 127.0.0.1:57912 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:37] 127.0.0.1:57912 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:38] 127.0.0.1:57912 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:05:56] 127.0.0.1:50024 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:17] 127.0.0.1:33394 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:23] 127.0.0.1:37532 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:29] 127.0.0.1:37548 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:30] 127.0.0.1:37548 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:42] 127.0.0.1:36056 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:06:56] 127.0.0.1:46912 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:06] 127.0.0.1:35524 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:08] 127.0.0.1:35524 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:13] 127.0.0.1:52108 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:22] 127.0.0.1:53372 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:36] 127.0.0.1:54588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:39] 127.0.0.1:54588 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:51] 127.0.0.1:50430 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:07:53] 127.0.0.1:50430 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:08:17] 127.0.0.1:37780 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:08:20] 127.0.0.1:37790 - "GET /api/v2/heartbeat HTTP/1.1" 200
+DEBUG:    [10-04-2026 18:09:12] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 18:09:12] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 18:09:12] 127.0.0.1:57908 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:12] 127.0.0.1:57908 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:12] 127.0.0.1:57916 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:36] 127.0.0.1:59958 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:46] 127.0.0.1:54484 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:48] 127.0.0.1:54484 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:09:53] 127.0.0.1:41670 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:02] 127.0.0.1:57808 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:07] 127.0.0.1:57816 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:17] 127.0.0.1:34594 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:24] 127.0.0.1:52162 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:33] 127.0.0.1:44934 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:46] 127.0.0.1:42126 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:53] 127.0.0.1:38482 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:10:57] 127.0.0.1:38486 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:06] 127.0.0.1:52862 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:07] 127.0.0.1:52862 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:15] 127.0.0.1:39174 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:17] 127.0.0.1:39174 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:22] 127.0.0.1:43248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:25] 127.0.0.1:43248 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:36] 127.0.0.1:36890 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:11:42] 127.0.0.1:46982 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:12:05] 127.0.0.1:60840 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:12:34] 127.0.0.1:35770 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:12:57] 127.0.0.1:60226 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:08] 127.0.0.1:52242 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:08] 127.0.0.1:52242 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:25] 127.0.0.1:57650 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:29] 127.0.0.1:57650 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:30] 127.0.0.1:57650 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:38] 127.0.0.1:44832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:13:52] 127.0.0.1:54004 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:08] 127.0.0.1:34126 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:11] 127.0.0.1:34126 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:11] 127.0.0.1:34126 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:19] 127.0.0.1:35900 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:23] 127.0.0.1:35900 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:35] 127.0.0.1:58826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:36] 127.0.0.1:58826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:37] 127.0.0.1:58826 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:44] 127.0.0.1:50050 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:44] 127.0.0.1:50050 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:49] 127.0.0.1:50062 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:14:56] 127.0.0.1:45526 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:00] 127.0.0.1:45538 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:08] 127.0.0.1:45364 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:08] 127.0.0.1:45364 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:08] 127.0.0.1:45364 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:14] 127.0.0.1:59832 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:19] 127.0.0.1:59844 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:22] 127.0.0.1:59844 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:28] 127.0.0.1:42044 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:45] 127.0.0.1:40304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:15:45] 127.0.0.1:40304 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/query HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:03] 127.0.0.1:59700 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:15] 127.0.0.1:41914 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:26] 127.0.0.1:32946 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:29] 127.0.0.1:32946 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:36] 127.0.0.1:55362 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:40] 127.0.0.1:55362 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:43] 127.0.0.1:55362 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:16:52] 127.0.0.1:36820 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:17:11] 127.0.0.1:45634 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:17:17] 127.0.0.1:45646 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:17:35] 127.0.0.1:43614 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:17:39] 127.0.0.1:43618 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:17:58] 127.0.0.1:52368 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:18:45] 127.0.0.1:56138 - "GET /api/v2/heartbeat HTTP/1.1" 200
+INFO:     [10-04-2026 18:19:10] 127.0.0.1:36160 - "GET /api/v2/heartbeat HTTP/1.1" 200
+DEBUG:    [10-04-2026 18:19:24] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 18:19:24] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 18:19:24] 127.0.0.1:39376 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 18:19:24] 127.0.0.1:39376 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 18:19:24] 127.0.0.1:39390 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:20:20] 127.0.0.1:51268 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:15] 127.0.0.1:42990 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:22] 127.0.0.1:47450 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:25] 127.0.0.1:47450 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:29] 127.0.0.1:47456 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:42] 127.0.0.1:37924 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:21:46] 127.0.0.1:37934 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:10] 127.0.0.1:35276 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:22] 127.0.0.1:42488 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:29] 127.0.0.1:42504 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:42] 127.0.0.1:57034 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:49] 127.0.0.1:57044 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:22:54] 127.0.0.1:52864 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:23:27] 127.0.0.1:37898 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:25:32] 127.0.0.1:42442 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:25:52] 127.0.0.1:43686 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:25:55] 127.0.0.1:43686 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:26:09] 127.0.0.1:49936 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:26:14] 127.0.0.1:44102 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:26:26] 127.0.0.1:55412 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:27:04] 127.0.0.1:49072 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:27:19] 127.0.0.1:45760 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:27:41] 127.0.0.1:35394 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:31:55] 127.0.0.1:45188 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:38:04] 127.0.0.1:38164 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:38:55] 127.0.0.1:55534 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:40:59] 127.0.0.1:44066 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:41:31] 127.0.0.1:47026 - "GET /api/v2/heartbeat HTTP/1.1" 200
+DEBUG:    [10-04-2026 18:43:31] Collection xxb_group_history already exists, returning existing collection.
+ERROR:    [10-04-2026 18:43:31] Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     [10-04-2026 18:43:31] 127.0.0.1:42804 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections HTTP/1.1" 200
+INFO:     [10-04-2026 18:43:31] 127.0.0.1:42804 - "GET /api/v2/pre-flight-checks HTTP/1.1" 200
+INFO:     [10-04-2026 18:43:31] 127.0.0.1:42810 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:43:40] 127.0.0.1:42818 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:46:08] 127.0.0.1:32774 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200
+INFO:     [10-04-2026 18:46:13] 127.0.0.1:55578 - "POST /api/v2/tenants/default_tenant/databases/default_database/collections/511dda72-3f47-4b1f-9b78-a48f4cfa09a7/upsert HTTP/1.1" 200

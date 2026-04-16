@@ -56,6 +56,14 @@ describe('Reply Parser', () => {
       const result = parseSingle(raw, fallbackId);
       expect(result.targetMessageId).toBe(fallbackId);
     });
+
+    it('preserves handoffToSplitter signal for downstream splitting', () => {
+      const raw = '{"replyContent": "给主人：收到啦。给不听：也有你的份。", "targetMessageId": 123, "handoffToSplitter": true}';
+      const result = parseSingle(raw, fallbackId);
+      expect(result.replyContent).toBe('给主人：收到啦。给不听：也有你的份。');
+      expect(result.targetMessageId).toBe(123);
+      expect(result).toHaveProperty('handoffToSplitter', true);
+    });
   });
 
   // ── Markdown code block ──

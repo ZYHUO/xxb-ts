@@ -24,6 +24,13 @@ export interface FormattedMessage {
   forwardFrom?: string;
   imageFileId?: string;
   imageDescriptions?: string[];
+  audioFileId?: string;
+  voiceFileId?: string;
+  documentFileId?: string;
+  documentMimeType?: string;
+  documentFileName?: string;
+  videoFileId?: string;
+  videoNoteFileId?: string;
   isBot?: boolean;
   /** 匿名管理员（sender_chat 是群组）或频道发言（sender_chat 是频道） */
   isAnonymous?: boolean;
@@ -33,10 +40,24 @@ export interface FormattedMessage {
   senderTag?: string;
 }
 
-export type JudgeAction = 'REPLY' | 'REPLY_PRO' | 'IGNORE' | 'REJECT';
+export type JudgeAction = 'REPLY' | 'IGNORE' | 'REJECT';
+export type ReplyPath = 'direct' | 'planned';
+export type ReplyTier = 'normal' | 'pro' | 'max';
+
+export function resolveReplyPath(action: JudgeAction, replyPath?: ReplyPath): ReplyPath | undefined {
+  if (action === 'REPLY') return replyPath ?? 'direct';
+  return undefined;
+}
+
+export function resolveReplyTier(action: JudgeAction, replyTier?: ReplyTier): ReplyTier | undefined {
+  if (action === 'REPLY') return replyTier ?? 'normal';
+  return undefined;
+}
 
 export interface JudgeResult {
   action: JudgeAction;
+  replyPath?: ReplyPath;
+  replyTier?: ReplyTier;
   level: 'L0_RULE' | 'L1_MICRO' | 'L2_AI';
   rule?: string;
   confidence?: number;
@@ -51,6 +72,7 @@ export interface ReplyOutput {
     | 'cute' | 'comfort' | 'tease' | 'happy' | 'sleepy'
     | 'curious' | 'playful' | 'confused' | 'shy' | 'sad'
     | 'smug' | 'annoyed' | 'dramatic' | 'cozy' | 'love';
+  replyQuote?: boolean;
 }
 
 export interface RetrievedContext {

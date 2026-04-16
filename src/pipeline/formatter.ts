@@ -36,6 +36,34 @@ interface TgChat {
   username?: string;
 }
 
+interface TgAudio {
+  file_id: string;
+  file_unique_id: string;
+  duration: number;
+  mime_type?: string;
+  file_name?: string;
+}
+
+interface TgDocument {
+  file_id: string;
+  file_unique_id: string;
+  mime_type?: string;
+  file_name?: string;
+}
+
+interface TgVideo {
+  file_id: string;
+  file_unique_id: string;
+  duration: number;
+  mime_type?: string;
+}
+
+interface TgVideoNote {
+  file_id: string;
+  file_unique_id: string;
+  duration: number;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
@@ -47,6 +75,11 @@ interface TgMessage {
   caption?: string;
   sticker?: TgSticker;
   photo?: TgPhotoSize[];
+  audio?: TgAudio;
+  voice?: TgAudio;
+  document?: TgDocument;
+  video?: TgVideo;
+  video_note?: TgVideoNote;
   reply_to_message?: TgMessage;
   forward_from?: TgUser;
   forward_sender_name?: string;
@@ -108,8 +141,10 @@ export function formatMessage(update: Record<string, unknown>): FormattedMessage
 
   // 匿名管理员：from 是 GroupAnonymousBot (id: 1087968824)，sender_chat 是真实群
   // 频道消息：from 为空，sender_chat 是频道
+  // 新版 API 频道代发：from 是 Channel_Bot (is_bot=true)，sender_chat 是频道
   const isAnonymousAdmin = from?.id === 1087968824;
-  const effectiveSenderChat = (isAnonymousAdmin || !from) ? senderChat : undefined;
+  const isChannelBot = !!(from?.is_bot && senderChat);
+  const effectiveSenderChat = (isAnonymousAdmin || !from || isChannelBot) ? senderChat : undefined;
 
   const uid = effectiveSenderChat ? effectiveSenderChat.id : from!.id;
   const username = effectiveSenderChat
@@ -163,6 +198,28 @@ export function formatMessage(update: Record<string, unknown>): FormattedMessage
 
   if (msg.photo && msg.photo.length > 0) {
     formatted.imageFileId = getLargestPhoto(msg.photo);
+  }
+
+  if (msg.audio) {
+    formatted.audioFileId = msg.audio.file_id;
+  }
+
+  if (msg.voice) {
+    formatted.voiceFileId = msg.voice.file_id;
+  }
+
+  if (msg.document) {
+    formatted.documentFileId = msg.document.file_id;
+    formatted.documentMimeType = msg.document.mime_type;
+    formatted.documentFileName = msg.document.file_name;
+  }
+
+  if (msg.video) {
+    formatted.videoFileId = msg.video.file_id;
+  }
+
+  if (msg.video_note) {
+    formatted.videoNoteFileId = msg.video_note.file_id;
   }
 
   return formatted;

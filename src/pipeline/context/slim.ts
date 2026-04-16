@@ -41,7 +41,11 @@ function formatContent(msg: FormattedMessage): string {
   const parts: string[] = [];
 
   if (msg.sticker) {
-    parts.push(`[贴纸 ${msg.sticker.emoji || '?'}]`);
+    const stickerWithDesc = msg.sticker as { emoji?: string; description?: string };
+    const stickerDesc = stickerWithDesc.description
+      ? `[贴纸: ${stickerWithDesc.description}]`
+      : `[贴纸]`;
+    parts.push(stickerDesc);
   }
 
   if (msg.imageFileId || (msg.imageDescriptions && msg.imageDescriptions.length > 0)) {
@@ -86,4 +90,16 @@ export function slimContextForAI(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Format a single message for token estimation (no "current message" star marker).
+ * Used by incremental token budget calculations.
+ */
+export function slimSingleMessage(msg: FormattedMessage, botUid: number): string {
+  const ts = formatTimestamp(msg.timestamp);
+  const nameTag = formatNameTag(msg, botUid);
+  const content = formatContent(msg);
+  const replyTag = formatReplyTag(msg);
+  return `[${ts} #${msg.messageId}] ${nameTag}: ${content}${replyTag}`;
 }

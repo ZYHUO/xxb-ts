@@ -4,12 +4,9 @@ dist/
 .env
 *.db
 *.db-journal
-*.db-shm
-*.db-wal
 data/
 logs/
 coverage/
 .turbo/
 .tsup/
 *.tsbuildinfo
-chroma.log

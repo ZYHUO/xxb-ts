@@ -21,6 +21,8 @@ export interface ParsedReply {
   replyContent: string;
   targetMessageId: number;
   stickerIntent?: (typeof STICKER_INTENTS)[number];
+  handoffToSplitter?: boolean;
+  replyQuote?: boolean;
 }
 
 /**
@@ -255,7 +257,14 @@ function validateAndReturn(
 
   const parsed = replyOutputSchema.safeParse(normalized);
   if (parsed.success) {
-    return truncateReply(parsed.data);
+    const result = truncateReply(parsed.data);
+    if (data['handoffToSplitter'] === true) {
+      result.handoffToSplitter = true;
+    }
+    if (data['replyQuote'] === false) {
+      result.replyQuote = false;
+    }
+    return result;
   }
 
   logger.debug({ errors: parsed.error.issues }, 'Zod validation failed for parsed data');

@@ -14,6 +14,13 @@ export interface CheckinResult {
   fortune: string;         // 今日运势
   rank: number;            // today's checkin rank in this chat
   todayCheckins: number;   // how many people checked in today
+  milestone?: 7 | 30 | 100; // 连续签到里程碑
+}
+
+export interface CheckinStats {
+  todayRank: Array<{ rank: number; fullName: string; username: string; streak: number; totalCheckins: number }>;
+  allTimeRank: Array<{ rank: number; fullName: string; username: string; totalCheckins: number }>;
+  todayCount: number;
 }
 
 const FORTUNES = [
@@ -158,6 +165,56 @@ export function doCheckin(
     fortune,
     rank,
     todayCheckins: rank,
+    milestone: ([100, 30, 7] as const).find(m => streak % m === 0 && streak > 0),
   };
   })();
+}
+
+export function getCheckinStats(chatId: number): CheckinStats {
+  const db = getDb();
+  const today = getTodayDate();
+
+  const todayRank = db.prepare(`
+    SELECT full_name, username, streak, total_checkins,
+      ROW_NUMBER() OVER (ORDER BY id ASC) as rank
+    FROM checkins
+    WHERE chat_id = ? AND checkin_date = ?
+    ORDER BY id ASC
+    LIMIT 10
+  `).all(chatId, today) as Array<{
+    rank: number; full_name: string; username: string; streak: number; total_checkins: number;
+  }>;
+
+  const allTimeRank = db.prepare(`
+    SELECT full_name, username, MAX(total_checkins) as total_checkins,
+      ROW_NUMBER() OVER (ORDER BY MAX(total_checkins) DESC) as rank
+    FROM checkins
+    WHERE chat_id = ?
+    GROUP BY uid
+    ORDER BY total_checkins DESC
+    LIMIT 10
+  `).all(chatId) as Array<{
+    rank: number; full_name: string; username: string; total_checkins: number;
+  }>;
+
+  const todayCount = (db.prepare(
+    'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ?',
+  ).get(chatId, today) as { cnt: number }).cnt;
+
+  return {
+    todayRank: todayRank.map(r => ({
+      rank: Number(r.rank),
+      fullName: r.full_name,
+      username: r.username,
+      streak: r.streak,
+      totalCheckins: r.total_checkins,
+    })),
+    allTimeRank: allTimeRank.map(r => ({
+      rank: Number(r.rank),
+      fullName: r.full_name,
+      username: r.username,
+      totalCheckins: r.total_checkins,
+    })),
+    todayCount,
+  };
 }

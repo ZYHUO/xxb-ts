@@ -48,11 +48,19 @@ export function buildToolSet(chatId: number, userId: number) {
   // ADD_TIMER — create a timer/reminder
   if (e.TIMER_API_URL) {
     tools.ADD_TIMER = tool({
-      description: '创建定时提醒。支持一次性提醒和循环定时任务。',
+      description: [
+        '创建定时提醒或定时任务。支持自然语言时间，模型负责将其转换为 cron 表达式（北京时间 UTC+8）。',
+        '示例:',
+        '  "3小时后提醒我" → one_time=true，cron=当前时间+3h',
+        '  "每天早上8点" → cron="0 8 * * *"，one_time=false',
+        '  "下午3点提醒一次" → one_time=true，cron="0 15 <今天日> <今月> *"',
+        '  "每周一早上9点" → cron="0 9 * * 1"',
+        '注意: cron表达式用本地北京时间，分 时 日 月 周。one_time=true表示只触发一次后自动删除。',
+      ].join('\n'),
       parameters: z.object({
         name: z.string().describe('定时器名称'),
-        cron_expression: z.string().describe('Cron表达式，如 "0 8 * * *" 表示每天8点'),
-        one_time: z.boolean().default(false).describe('是否为一次性定时器'),
+        cron_expression: z.string().describe('Cron表达式（北京时间）：分 时 日 月 周，如 "30 14 12 4 *"'),
+        one_time: z.boolean().default(false).describe('是否为一次性触发（触发后自动删除）'),
         message: z.string().optional().describe('提醒消息内容'),
       }),
       execute: async (params) => addTimer({ ...params, chatId, userId }),
@@ -89,4 +97,8 @@ export function buildToolSet(chatId: number, userId: number) {
   });
 
   return tools;
+}
+
+export function getToolNames(chatId: number, userId: number): string[] {
+  return Object.keys(buildToolSet(chatId, userId));
 }

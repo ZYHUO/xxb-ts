@@ -8,37 +8,12 @@
 // L5: Task (reply.md or reply-pro.md)
 // ────────────────────────────────────────
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { FormattedMessage, JudgeAction } from '../../shared/types.js';
-import { loadPrompt, getConfig } from '../../shared/config.js';
+import type { FormattedMessage, ReplyTier } from '../../shared/types.js';
+import { loadCachedPrompt, _resetPromptCache, getConfig } from '../../shared/config.js';
 
 const SECTION_SEP = '\n\n---\n\n';
-
-let _promptCache: Map<string, string> | undefined;
-
-function getPromptCache(): Map<string, string> {
-  if (!_promptCache) {
-    _promptCache = new Map();
-  }
-  return _promptCache;
-}
-
-function loadCachedPrompt(relativePath: string): string {
-  const cache = getPromptCache();
-  const cached = cache.get(relativePath);
-  if (cached !== undefined) return cached;
-
-  const config = getConfig();
-  const content = loadPrompt(relativePath, config.promptsDir);
-  cache.set(relativePath, content);
-  // Cap cache at 200 entries (evict oldest — first in insertion order)
-  if (cache.size > 200) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
-  }
-  return content;
-}
 
 function loadPersonaForUser(userId: number | undefined): string {
   if (!userId) {
@@ -47,15 +22,12 @@ function loadPersonaForUser(userId: number | undefined): string {
   const { personaDir } = getConfig();
   const md = resolve(personaDir, `${userId}.md`);
   const txt = resolve(personaDir, `${userId}.txt`);
-  try {
-    if (existsSync(md)) {
-      return readFileSync(md, 'utf-8').trim();
+  for (const path of [md, txt]) {
+    try {
+      return readFileSync(path, 'utf-8').trim();
+    } catch {
+      /* file not found, try next */
     }
-    if (existsSync(txt)) {
-      return readFileSync(txt, 'utf-8').trim();
-    }
-  } catch {
-    /* fall through */
   }
   return loadCachedPrompt('identity/persona.md');
 }
@@ -64,13 +36,8 @@ function loadPersonaForUser(userId: number | undefined): string {
  * Build the 5-layer system prompt.
  * @param userId — optional; loads prompts/persona/{userId}.md|.txt when present (PHP PersonaManager parity).
  */
-export function buildSystemPrompt(action: JudgeAction, userId?: number): string {
+export function buildSystemPrompt(replyTier: ReplyTier = 'normal', userId?: number): string {
   const layers: string[] = [];
-
-  // L0: Runtime context (current time)
-  const now = new Date();
-  const timeStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' });
-  layers.push(`# 当前时间\n\n${timeStr}（北京时间）`);
 
   // L1: Identity
   layers.push(loadPersonaForUser(userId));
@@ -87,7 +54,9 @@ export function buildSystemPrompt(action: JudgeAction, userId?: number): string 
   layers.push(loadCachedPrompt('style/tone.md'));
 
   // L5: Task
-  const taskFile = action === 'REPLY_PRO' ? 'task/reply-pro.md' : 'task/reply.md';
+  const taskFile = replyTier === 'max' ? 'task/reply-max.md'
+    : replyTier === 'pro' ? 'task/reply-pro.md'
+    : 'task/reply.md';
   layers.push(loadCachedPrompt(taskFile));
 
   return layers.filter(Boolean).join(SECTION_SEP);
@@ -102,6 +71,10 @@ function sanitizeSenderString(s: string, maxLen = 64): string {
   return s.replace(/[\x00-\x09\x0b-\x1f]/g, '').slice(0, maxLen);
 }
 
+export interface ReplyShapeHint {
+  exactReplyCount?: number;
+}
+
 /**
  * Build the messages array for AI call.
  */
@@ -114,9 +87,18 @@ export function buildMessages(
   memberRoster?: string,
   botKnowledge?: string,
   userProfile?: string,
+  userPreferences?: string,
   selfReflection?: string,
+  toolResults?: string,
+  replyShapeHint?: ReplyShapeHint,
+  chatId?: number,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const userParts: string[] = [];
+
+  // Runtime context: current time (kept in user turn so system prompt stays stable for caching)
+  const now = new Date();
+  const timeStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' });
+  userParts.push(`# 当前时间\n\n${timeStr}（北京时间）`);
 
   if (knowledge) {
     userParts.push(`[知识库]\n${knowledge}`);
@@ -138,9 +120,28 @@ export function buildMessages(
     userParts.push(`[自我反思·回复规律]\n${selfReflection}`);
   }
 
-  userParts.push(`[群聊上下文]\n${context}`);
+  if (toolResults) {
+    userParts.push(toolResults);
+  }
 
-  const msgText = latestMessage.textContent || latestMessage.captionContent || '[空消息]';
+  if (replyShapeHint?.exactReplyCount && replyShapeHint.exactReplyCount > 1) {
+    userParts.push(
+      `[REPLY_COUNT_REQUIREMENT]\n必须输出恰好 ${replyShapeHint.exactReplyCount} 条消息，并使用 JSON 数组返回，不能合并成一条。`,
+    );
+  }
+
+  const contextLabel = chatId !== undefined && chatId > 0 ? '私聊上下文' : '群聊上下文';
+  userParts.push(`[${contextLabel}]\n${context}`);
+
+  // DM mode: inject private chat style and capabilities hint
+  if (chatId !== undefined && chatId > 0) {
+    userParts.push(`[私聊模式]\n这是一对一的私聊对话。你可以更亲近、更自然地交流，回复可以适当长一些。\n你在私聊中的能力：帮用户记住偏好（"记住xxx"）、查看已记住的内容（"你记住了什么"）、忘记某条偏好（"忘掉xxx"）、查看群消息摘要（"看看群里在聊什么"）、帮用户在群里传话。`);
+  }
+
+  const stickerDesc = (latestMessage.sticker as { description?: string } | undefined)?.description;
+  const msgText = latestMessage.textContent || latestMessage.captionContent
+    || (stickerDesc && stickerDesc !== '[动态贴纸]' ? `[贴纸: ${stickerDesc}]` : stickerDesc)
+    || '[空消息]';
   const safeName = sanitizeSenderString(latestMessage.fullName ?? '');
   const safeUser = sanitizeSenderString(latestMessage.username ?? '');
   const senderLabel = latestMessage.isAnonymous
@@ -154,6 +155,9 @@ export function buildMessages(
   if (userProfile) {
     currentMsgBlock += `\n用户画像: ${userProfile}`;
   }
+  if (userPreferences) {
+    currentMsgBlock += `\n用户偏好记录:\n${userPreferences}`;
+  }
   currentMsgBlock += `\n内容: ${msgText}`;
   userParts.push(currentMsgBlock);
 
@@ -163,7 +167,4 @@ export function buildMessages(
   ];
 }
 
-/** Reset prompt cache (for testing) */
-export function _resetPromptCache(): void {
-  _promptCache = undefined;
-}
+export { _resetPromptCache };

@@ -32,6 +32,9 @@ vi.mock('../../../src/cron/knowledge-sync.js', () => ({
 vi.mock('../../../src/tracking/user-profile.js', () => ({
   runUserProfileSync: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../../src/cron/idle.js', () => ({
+  runIdleCheck: vi.fn().mockResolvedValue(undefined),
+}));
 
 const { startCronJobs, stopCronJobs, isStarted } = await import(
   '../../../src/cron/scheduler.js'
@@ -52,8 +55,8 @@ describe('CronScheduler', () => {
   it('should register cron jobs on start', () => {
     startCronJobs();
 
-    // model-check, daily-report, cleanup, knowledge-sync, user-profile-sync
-    expect(mockSchedule).toHaveBeenCalledTimes(5);
+    // model-check, daily-report, cleanup, knowledge-sync, user-profile-sync, idle-check
+    expect(mockSchedule).toHaveBeenCalledTimes(6);
     expect(isStarted()).toBe(true);
   });
 
@@ -61,14 +64,14 @@ describe('CronScheduler', () => {
     startCronJobs();
     startCronJobs(); // second call should be no-op
 
-    expect(mockSchedule).toHaveBeenCalledTimes(5);
+    expect(mockSchedule).toHaveBeenCalledTimes(6);
   });
 
   it('should stop all jobs on stopCronJobs', () => {
     startCronJobs();
     stopCronJobs();
 
-    expect(mockStop).toHaveBeenCalledTimes(5);
+    expect(mockStop).toHaveBeenCalledTimes(6);
     expect(isStarted()).toBe(false);
   });
 
@@ -83,6 +86,7 @@ describe('CronScheduler', () => {
     expect(schedules).toContain('0 */6 * * *');   // cleanup
     expect(schedules).toContain('30 * * * *');    // knowledge-sync (default)
     expect(schedules).toContain('7 * * * *');     // user-profile-sync
+    expect(schedules).toContain('*/5 * * * *');   // idle-check shares cadence with model check
   });
 
   it('should not start jobs when CRON_ENABLED is false', () => {

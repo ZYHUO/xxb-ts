@@ -30,6 +30,11 @@ function initSchema(db: Database.Database): void {
     'utf-8',
   );
   db.exec(migrationSql);
+  const feedbackSql = readFileSync(
+    resolve(process.cwd(), 'migrations/0006_sticker_feedback.sql'),
+    'utf-8',
+  );
+  db.exec(feedbackSql);
 }
 
 function seedReadySticker(

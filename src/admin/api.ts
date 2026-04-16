@@ -49,27 +49,7 @@ async function handleBootstrap(
   const manualQueue = await allowlist.listManualQueue(deps.redis, deps.config);
   const override = await runtimeConfig.loadOverride(deps.redis);
 
-  const modelRouting = runtimeConfig.buildModelRoutingAdminView(
-    {
-      AI_MODEL_REPLY: deps.env.AI_MODEL_REPLY,
-      AI_MODEL_REPLY_PRO: deps.env.AI_MODEL_REPLY_PRO,
-      AI_MODEL_JUDGE: deps.env.AI_MODEL_JUDGE,
-      AI_MODEL_ALLOWLIST_REVIEW: deps.env.AI_MODEL_ALLOWLIST_REVIEW,
-    },
-    override,
-  );
-
-  // Strip API keys from providers before sending to client
-  if (modelRouting.providers && typeof modelRouting.providers === 'object') {
-    const sanitized = modelRouting.providers as Record<string, Record<string, unknown>>;
-    for (const label of Object.keys(sanitized)) {
-      const entry = sanitized[label];
-      if (entry) {
-        delete entry.api_key;
-        delete entry.api_keys;
-      }
-    }
-  }
+  const modelRouting = runtimeConfig.buildModelRoutingAdminView();
 
   const stickerPolicy = runtimeConfig.buildStickerPolicyAdminView(override);
 
@@ -250,66 +230,15 @@ async function handleRemoveGroup(
   return { ok };
 }
 
-async function handleModelRoutingGet(deps: ApiDeps): Promise<Record<string, unknown>> {
-  const override = await runtimeConfig.loadOverride(deps.redis);
-  const view = runtimeConfig.buildModelRoutingAdminView(
-    {
-      AI_MODEL_REPLY: deps.env.AI_MODEL_REPLY,
-      AI_MODEL_REPLY_PRO: deps.env.AI_MODEL_REPLY_PRO,
-      AI_MODEL_JUDGE: deps.env.AI_MODEL_JUDGE,
-      AI_MODEL_ALLOWLIST_REVIEW: deps.env.AI_MODEL_ALLOWLIST_REVIEW,
-    },
-    override,
-  );
-
-  // Strip API keys from providers before sending to client
-  if (view.providers && typeof view.providers === 'object') {
-    const sanitized = view.providers as Record<string, Record<string, unknown>>;
-    for (const label of Object.keys(sanitized)) {
-      const entry = sanitized[label];
-      if (entry) {
-        delete entry.api_key;
-        delete entry.api_keys;
-      }
-    }
-  }
-
+async function handleModelRoutingGet(): Promise<Record<string, unknown>> {
+  const view = runtimeConfig.buildModelRoutingAdminView();
   return { ok: true, ...view };
-}
-
-async function handleModelRoutingSave(
-  deps: ApiDeps,
-  body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const override = (await runtimeConfig.loadOverride(deps.redis)) ?? {};
-  override.usage = body.usage as typeof override.usage;
-  await runtimeConfig.saveOverride(deps.redis, override);
-  logger.info('Model routing override saved via admin');
-  return { ok: true };
-}
-
-async function handleProviderUpsert(
-  deps: ApiDeps,
-  body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const label = String(body.label ?? '');
-  const provider = body.provider as runtimeConfig.ProviderOverride | undefined;
-  if (!label || !provider?.endpoint || !provider?.model) {
-    return { ok: false, error: 'invalid_provider_params' };
-  }
-
-  const override = (await runtimeConfig.loadOverride(deps.redis)) ?? {};
-  if (!override.providers) override.providers = {};
-  override.providers[label] = provider;
-  await runtimeConfig.saveOverride(deps.redis, override);
-  logger.info({ label }, 'Provider upserted via admin');
-  return { ok: true };
 }
 
 async function handleProviderValidate(
   body: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const provider = body.provider as runtimeConfig.ProviderOverride | undefined;
+  const provider = body.provider as runtimeConfig.ProviderValidateInput | undefined;
   if (!provider?.endpoint || !provider?.model) {
     return { ok: false, error: 'invalid_provider_params' };
   }
@@ -488,13 +417,7 @@ export function createAdminApi(deps: ApiDeps): Hono {
           return c.json(await handleRemoveGroup(deps, body));
         case 'model_routing_get':
           if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
-          return c.json(await handleModelRoutingGet(deps));
-        case 'model_routing_save':
-          if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
-          return c.json(await handleModelRoutingSave(deps, body));
-        case 'provider_upsert':
-          if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
-          return c.json(await handleProviderUpsert(deps, body));
+          return c.json(await handleModelRoutingGet());
         case 'provider_validate':
           if (!master) return c.json({ ok: false, error: 'forbidden' }, 403);
           return c.json(await handleProviderValidate(body));
