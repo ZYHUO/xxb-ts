@@ -91,7 +91,7 @@ function formatSubmitter(item) {
 
 function decisionClass(decision) {
   if (decision === 'APPROVE') return 'status-on';
-  if (decision === 'REJECT') return 'perm-false';
+  if (decision === 'REJECT') return 'status-error';
   return '';
 }
 
@@ -126,329 +126,187 @@ function onRefresh() {
 </script>
 
 <template>
-  <div class="admin-review-head">
-    <div class="tg-section-header admin-review-title">审核中心</div>
-    <button type="button" class="admin-refresh-btn" @click="onRefresh">刷新</button>
-  </div>
+  <div>
+    <div class="admin-head">
+      <div class="section-label">审核中心</div>
+      <button type="button" class="btn btn-sm btn-secondary" @click="onRefresh">刷新</button>
+    </div>
 
-  <template v-if="allEmpty">
-    <section class="tg-section">
-      <div class="tg-cell tg-cell-center">
-        <span class="tg-hint">暂无待处理事项。</span>
+    <template v-if="allEmpty">
+      <div class="card" style="text-align:center">
+        <span class="text-hint">暂无待处理事项。</span>
       </div>
-    </section>
-  </template>
+    </template>
 
-  <template v-else>
-    <template v-for="section in sections" :key="section.key">
-      <!-- Section toggle -->
-      <section class="tg-section">
-        <button class="tg-cell tg-cell-row section-toggle" @click="toggleSection(section.key)">
-          <span class="tg-cell-label section-label-stack">
-            {{ section.title }}
-            <span v-if="section.subtitle" class="section-subtitle">{{ section.subtitle }}</span>
-          </span>
-          <span class="section-count">
-            <span class="section-count-num">{{ section.items.length }}</span>
-            <span class="section-arrow" :class="{ 'section-arrow-open': openSections[section.key] }">›</span>
-          </span>
-        </button>
-      </section>
+    <template v-else>
+      <template v-for="section in sections" :key="section.key">
+        <!-- Section toggle -->
+        <div class="card" style="padding:0">
+          <button class="section-toggle" @click="toggleSection(section.key)">
+            <span class="section-toggle-left">
+              <span style="font-weight:600;font-size:14px">{{ section.title }}</span>
+              <span v-if="section.subtitle" class="text-hint" style="font-size:12px">{{ section.subtitle }}</span>
+            </span>
+            <span class="section-toggle-right">
+              <span class="badge badge-accent">{{ section.items.length }}</span>
+              <span class="section-arrow" :class="{ open: openSections[section.key] }">›</span>
+            </span>
+          </button>
+        </div>
 
-      <!-- Section body -->
-      <template v-if="openSections[section.key]">
-        <template v-if="!section.items.length">
-          <div class="tg-section-footer">暂无记录。</div>
-        </template>
+        <!-- Section body -->
+        <template v-if="openSections[section.key]">
+          <div v-if="!section.items.length" style="padding:4px 0">
+            <span class="text-hint" style="font-size:12px">暂无记录。</span>
+          </div>
 
-        <template v-else>
           <template v-for="item in section.items" :key="item.request_id || item.chat_id">
-            <section class="tg-section record-section">
-              <!-- Title row -->
-              <div class="tg-cell tg-cell-multi">
-                <div class="tg-cell-row">
-                  <strong class="record-title">{{ item.chat_title || item.title || item.chat_id }}</strong>
-                  <span class="tg-cell-value record-time">
-                    {{ formatTimestamp(item.ai_reviewed_at || item.updated_at || item.created_at) }}
-                  </span>
-                </div>
-                <span class="tg-cell-subtitle">{{ item.chat_id }}</span>
+            <div class="card">
+              <!-- Title -->
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+                <strong style="font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.chat_title || item.title || item.chat_id }}</strong>
+                <span v-if="item.chat_username" style="font-size:12px;color:var(--muted);margin-left:6px">{{ item.chat_username }}</span>
+                <span class="text-hint" style="font-size:12px;flex-shrink:0">{{ formatTimestamp(item.ai_reviewed_at || item.updated_at || item.created_at) }}</span>
               </div>
+              <div class="text-hint" style="font-size:12px;margin-bottom:8px">{{ item.chat_id }}</div>
 
-              <div class="tg-cell tg-cell-row submitter-row">
-                <span class="tg-cell-label submitter-label">提交者</span>
-                <span class="tg-cell-value submitter-value">{{ formatSubmitter(item) }}</span>
+              <div class="form-row">
+                <span class="form-row-label">提交者</span>
+                <span class="form-row-value">{{ formatSubmitter(item) }}</span>
               </div>
 
               <!-- Fields for manual / ai -->
               <template v-if="section.key !== 'groups'">
-                <div class="tg-cell tg-cell-row">
-                  <span class="tg-cell-label">AI 决定</span>
-                  <span :class="['tg-cell-value', decisionClass(item.ai_decision)]">
-                    {{ item.ai_decision || '—' }}
-                  </span>
+                <div class="form-row">
+                  <span class="form-row-label">AI 决定</span>
+                  <span :class="['form-row-value', decisionClass(item.ai_decision)]">{{ item.ai_decision || '—' }}</span>
                 </div>
-                <div class="tg-cell tg-cell-row">
-                  <span class="tg-cell-label">置信度</span>
-                  <span class="tg-cell-value">{{ formatConfidence(item.ai_confidence) }}</span>
+                <div class="form-row">
+                  <span class="form-row-label">置信度</span>
+                  <span class="form-row-value">{{ formatConfidence(item.ai_confidence) }}</span>
                 </div>
-                <div class="tg-cell tg-cell-multi">
-                  <div class="tg-cell-row">
-                    <span class="tg-cell-label">理由</span>
-                    <button
-                      v-if="item.ai_reason"
-                      class="reason-toggle"
-                      @click="toggleReason(reasonKey(section.key, item))"
-                    >
+                <div style="padding:8px 0">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span class="form-row-label">理由</span>
+                    <button v-if="item.ai_reason" class="reason-toggle" @click="toggleReason(reasonKey(section.key, item))">
                       {{ expandedReasons[reasonKey(section.key, item)] ? '收起' : '展开' }}
                     </button>
                   </div>
-                  <span class="tg-cell-subtitle reason-text">{{ formatReason(section.key, item) }}</span>
+                  <span class="text-hint" style="font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word">{{ formatReason(section.key, item) }}</span>
                 </div>
               </template>
 
-              <!-- Fields for manual: note -->
-              <div v-if="section.key === 'manual'" class="tg-cell tg-cell-multi">
-                <span class="tg-cell-label">备注</span>
-                <span class="tg-cell-subtitle">{{ item.note || '无备注' }}</span>
+              <!-- Note for manual -->
+              <div v-if="section.key === 'manual'" style="padding:8px 0;border-top:1px solid rgba(255,255,255,0.04)">
+                <span class="form-row-label" style="display:block;margin-bottom:4px">备注</span>
+                <span class="text-hint" style="font-size:13px">{{ item.note || '无备注' }}</span>
               </div>
 
               <!-- Fields for groups -->
               <template v-if="section.key === 'groups'">
-                <div class="tg-cell tg-cell-row">
-                  <span class="tg-cell-label">审核</span>
-                  <span class="tg-cell-value">
-                    {{ item.review_state === 'auto_approved' ? 'AI 自动' : (item.review_state === 'manual_approved' ? '人工通过' : (item.review_state || '—')) }}
-                  </span>
+                <div class="form-row">
+                  <span class="form-row-label">审核</span>
+                  <span class="form-row-value">{{ item.review_state === 'auto_approved' ? 'AI 自动' : (item.review_state === 'manual_approved' ? '人工通过' : (item.review_state || '—')) }}</span>
                 </div>
-                <div class="tg-cell tg-cell-row">
-                  <span class="tg-cell-label">来源</span>
-                  <span class="tg-cell-value">{{ item.approved_by || '—' }}</span>
+                <div class="form-row">
+                  <span class="form-row-label">来源</span>
+                  <span class="form-row-value">{{ item.approved_by || '—' }}</span>
                 </div>
-                <div class="tg-cell tg-cell-row">
-                  <span class="tg-cell-label">状态</span>
-                  <span :class="['tg-cell-value', item.enabled ? 'status-on' : 'status-off']">
-                    {{ item.enabled ? '已启用' : '未启用' }}
-                  </span>
+                <div class="form-row">
+                  <span class="form-row-label">状态</span>
+                  <span :class="['form-row-value', item.enabled ? 'status-on' : 'status-off']">{{ item.enabled ? '已启用' : '未启用' }}</span>
                 </div>
               </template>
 
               <!-- Action buttons: manual -->
-              <div v-if="section.key === 'manual'" class="action-group">
-                <button
-                  class="tg-button tg-button-primary"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="emit('approve', item)"
-                >
+              <div v-if="section.key === 'manual'" class="btn-group" style="margin-top:10px">
+                <button class="btn btn-primary btn-full" :disabled="Boolean(adminBusyKey)" @click="emit('approve', item)">
                   {{ adminBusyKey === `approve:${item.request_id}` ? '处理中…' : '通过' }}
                 </button>
-                <button
-                  class="tg-button tg-button-secondary"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="emit('approve-enable', item)"
-                >
+                <button class="btn btn-secondary btn-full" :disabled="Boolean(adminBusyKey)" @click="emit('approve-enable', item)">
                   {{ adminBusyKey === `approve_on:${item.request_id}` ? '处理中…' : '通过并启用' }}
                 </button>
-                <button
-                  class="tg-button tg-button-secondary"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="emit('ai-review', item)"
-                >
+                <button class="btn btn-secondary btn-full" :disabled="Boolean(adminBusyKey)" @click="emit('ai-review', item)">
                   {{ adminBusyKey === `ai_review:${item.request_id}` ? '处理中…' : 'AI 审核' }}
                 </button>
-                <button
-                  class="tg-button tg-button-danger"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="onReject(item)"
-                >
+                <button class="btn btn-danger btn-full" :disabled="Boolean(adminBusyKey)" @click="onReject(item)">
                   {{ adminBusyKey === `reject:${item.request_id}` ? '处理中…' : '拒绝' }}
                 </button>
               </div>
 
               <!-- Action buttons: groups -->
-              <div v-if="section.key === 'groups'" class="action-group">
-                <button
-                  class="tg-button tg-button-secondary"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="emit('check-group-permissions', item)"
-                >
-                  检查 Bot 权限
-                </button>
-                <button
-                  class="tg-button tg-button-plain"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="onToggleGroup(item)"
-                >
+              <div v-if="section.key === 'groups'" class="btn-group" style="margin-top:10px">
+                <button class="btn btn-secondary btn-full" :disabled="Boolean(adminBusyKey)" @click="emit('check-group-permissions', item)">检查 Bot 权限</button>
+                <button class="btn btn-full" :disabled="Boolean(adminBusyKey)" @click="onToggleGroup(item)">
                   {{ adminBusyKey === `toggle:${item.chat_id}` ? '处理中…' : item.enabled ? '关闭' : '启用' }}
                 </button>
-                <button
-                  class="tg-button tg-button-danger"
-                  :disabled="Boolean(adminBusyKey)"
-                  @click="onRemoveGroup(item)"
-                >
+                <button class="btn btn-danger btn-full" :disabled="Boolean(adminBusyKey)" @click="onRemoveGroup(item)">
                   {{ adminBusyKey === `remove:${item.chat_id}` ? '处理中…' : '移除' }}
                 </button>
               </div>
-            </section>
+            </div>
           </template>
         </template>
       </template>
     </template>
-  </template>
 
-  <!-- Admin feedback -->
-  <div v-if="adminMessage" :class="['tg-banner', `tg-banner-${adminTone}`]">
-    {{ adminMessage }}
+    <!-- Admin feedback -->
+    <div v-if="adminMessage" :class="['banner', adminTone === 'success' ? 'banner-success' : 'banner-danger']">
+      {{ adminMessage }}
+    </div>
   </div>
 </template>
 
 <style scoped>
-.admin-review-head {
+.admin-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-right: 16px;
+  margin-bottom: 6px;
 }
 
-.admin-review-title {
-  flex: 1;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.admin-refresh-btn {
-  flex-shrink: 0;
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
   border: none;
-  background: color-mix(in srgb, var(--tg-theme-button-color, #007aff) 14%, transparent);
-  color: var(--tg-theme-button-color, #007aff);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
-.admin-refresh-btn:active {
-  opacity: 0.7;
-}
+.section-toggle:active { opacity: 0.7; }
 
-.section-label-stack {
+.section-toggle-left {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  text-align: left;
-  min-width: 0;
 }
 
-.section-subtitle {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--tg-theme-hint-color, #8e8e93);
-  line-height: 1.35;
-  white-space: normal;
-}
-
-.section-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.section-toggle:active {
-  background: color-mix(in srgb, var(--tg-theme-hint-color, #8e8e93) 8%, transparent);
-}
-
-.section-count {
+.section-toggle-right {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.section-count-num {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #007aff));
+  gap: 6px;
 }
 
 .section-arrow {
   font-size: 18px;
   font-weight: 600;
-  transition: transform 0.2s ease;
-  color: var(--tg-theme-hint-color, #8e8e93);
+  color: var(--muted);
+  transition: transform 0.2s;
 }
 
-.section-arrow-open {
-  transform: rotate(90deg);
-}
-
-.submitter-label {
-  color: var(--tg-theme-text-color, #000000);
-  font-weight: 600;
-}
-
-.submitter-value {
-  color: var(--tg-theme-text-color, #000000) !important;
-  font-weight: 500;
-  text-align: right;
-}
-
-.record-section {
-  margin-top: 6px;
-}
-
-.record-title {
-  font-size: 15px;
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.record-time {
-  font-size: 13px;
-  flex-shrink: 0;
-}
+.section-arrow.open { transform: rotate(90deg); }
 
 .reason-toggle {
   border: none;
   background: transparent;
-  color: var(--tg-theme-link-color, #007aff);
-  font-size: 13px;
+  color: var(--accent);
+  font-size: 12px;
   cursor: pointer;
   padding: 0;
-}
-
-.reason-text {
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.action-group {
-  display: grid;
-  gap: 8px;
-  padding: 10px 16px 14px;
-}
-
-.status-on {
-  color: #34c759;
-  font-weight: 600;
-}
-
-.status-off {
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.perm-false {
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-  font-weight: 600;
 }
 </style>

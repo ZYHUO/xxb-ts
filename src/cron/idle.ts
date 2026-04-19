@@ -10,13 +10,13 @@ import { callWithFallback } from '../ai/fallback.js';
 import { env } from '../env.js';
 import { logger } from '../shared/logger.js';
 
-const IDLE_THRESHOLD_SEC = 30 * 60;  // 30 minutes of silence
-const TRIGGER_PROBABILITY = 0.30;    // 30% chance to fire when idle
+const IDLE_THRESHOLD_SEC = 60 * 60;  // 30 minutes of silence
+const TRIGGER_PROBABILITY = 0.10;    // 30% chance to fire when idle
 const HOUR_START = 10;               // 10:00 Beijing
 const HOUR_END = 23;                 // 23:00 Beijing
 const CTX_PREFIX = 'xxb:ctx:';
 const LAST_POKE_PREFIX = 'xxb:last_poke:';
-const MIN_PROACTIVE_INTERVAL = 90 * 60; // at least 90 min between proactive pokes per chat
+const MIN_PROACTIVE_INTERVAL = 3 * 60 * 60; // at least 90 min between proactive pokes per chat
 
 const sender = new StreamingSender();
 

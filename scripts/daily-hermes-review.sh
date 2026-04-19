@@ -10,11 +10,90 @@ TZ_NAME="${TZ_NAME:-Asia/Shanghai}"
 NOW_LOCAL="$(TZ="$TZ_NAME" date '+%F %T %Z')"
 TODAY_LOCAL="$(TZ="$TZ_NAME" date '+%F')"
 YESTERDAY_LOCAL="$(TZ="$TZ_NAME" date -d 'yesterday' '+%F')"
+REVIEW_START_LOCAL="${YESTERDAY_LOCAL} 01:00:00"
+REVIEW_END_LOCAL="${TODAY_LOCAL} 01:00:00"
+RUNTIME_SERVICE_NAME="${RUNTIME_SERVICE_NAME:-xxb-ts.service}"
+JOURNALCTL_BIN="${JOURNALCTL_BIN:-$(command -v journalctl || true)}"
 LOG_DIR="${ROOT_DIR}/logs"
 REPORT_PATH="${LOG_DIR}/hermes-daily-review-${TODAY_LOCAL}.md"
 CRON_LOG_PATH="${LOG_DIR}/daily-hermes-cron.log"
-OUT0_PATH="${LOG_DIR}/out-0.log"
-ERROR0_PATH="${LOG_DIR}/error-0.log"
+OUT_LOG_PATH="${LOG_DIR}/out.log"
+ERROR_LOG_PATH="${LOG_DIR}/error.log"
+
+resolve_runtime_log() {
+  local preferred="$1"
+  local glob_pattern="$2"
+
+  python3 - "$preferred" "$glob_pattern" <<'PY'
+import glob
+import os
+import sys
+
+preferred = sys.argv[1]
+glob_pattern = sys.argv[2]
+paths = set(glob.glob(glob_pattern))
+paths.add(preferred)
+matches = [path for path in paths if os.path.isfile(path)]
+if not matches:
+    raise SystemExit(1)
+latest = max(matches, key=lambda path: os.path.getmtime(path))
+print(latest)
+PY
+}
+
+append_log_section() {
+  local title="$1"
+  local limit="$2"
+  local log_path="$3"
+
+  if [[ -z "$log_path" || ! -f "$log_path" ]]; then
+    return 1
+  fi
+
+  {
+    echo
+    echo "## ${title}"
+    printf -- '- Source: %s\n' "$log_path"
+    printf -- '- Modified: %s\n' "$(TZ="$TZ_NAME" stat -c '%y' "$log_path")"
+    tail -n "$limit" "$log_path"
+  } >> "$REPORT_PATH"
+}
+
+append_journal_section() {
+  local title="$1"
+  local limit="$2"
+  local service_name="$3"
+  local since_local="$4"
+  local until_local="$5"
+  local tmp_journal
+
+  if [[ -z "$JOURNALCTL_BIN" || ! -x "$JOURNALCTL_BIN" ]]; then
+    return 1
+  fi
+
+  tmp_journal="$(mktemp)"
+  if ! TZ="$TZ_NAME" "$JOURNALCTL_BIN" --no-pager -u "$service_name" --since "$since_local" --until "$until_local" -n "$limit" -o short-iso >"$tmp_journal" 2>/dev/null; then
+    rm -f "$tmp_journal"
+    return 1
+  fi
+
+  {
+    echo
+    echo "## ${title}"
+    printf -- '- Source: journald (%s)\n' "$service_name"
+    printf -- '- Review window: %s %s -> %s %s\n' "$since_local" "$TZ_NAME" "$until_local" "$TZ_NAME"
+    if [[ -s "$tmp_journal" ]]; then
+      cat "$tmp_journal"
+    else
+      echo '(no journal entries found in review window)'
+    fi
+  } >> "$REPORT_PATH"
+
+  rm -f "$tmp_journal"
+}
+
+OUT_RUNTIME_PATH="$(resolve_runtime_log "$OUT_LOG_PATH" "${LOG_DIR}/out*.log" || true)"
+ERROR_RUNTIME_PATH="$(resolve_runtime_log "$ERROR_LOG_PATH" "${LOG_DIR}/error*.log" || true)"
 
 mkdir -p "$LOG_DIR"
 
@@ -43,7 +122,7 @@ append_section() {
   echo
   echo "- Generated: ${NOW_LOCAL}"
   echo "- Repo: ${ROOT_DIR}"
-  echo "- Review window: ${YESTERDAY_LOCAL} 01:00 ${TZ_NAME} -> ${TODAY_LOCAL} 01:00 ${TZ_NAME}"
+  echo "- Review window: ${REVIEW_START_LOCAL} ${TZ_NAME} -> ${REVIEW_END_LOCAL} ${TZ_NAME}"
   echo
   echo "This report captures runtime signals, repository state, and Hermes review output for the last day."
 } > "$REPORT_PATH"
@@ -51,12 +130,9 @@ append_section() {
 append_section "Git Status" git -C "$ROOT_DIR" status --short
 append_section "Recent Commits" git -C "$ROOT_DIR" log --oneline -n 8
 
-if [[ -f "$OUT0_PATH" ]]; then
-  append_section "Recent out-0.log (tail 200)" tail -n 200 "$OUT0_PATH"
-fi
-
-if [[ -f "$ERROR0_PATH" ]]; then
-  append_section "Recent error-0.log (tail 120)" tail -n 120 "$ERROR0_PATH"
+if ! append_journal_section "Recent runtime journal (review window, tail 200)" 200 "$RUNTIME_SERVICE_NAME" "$REVIEW_START_LOCAL" "$REVIEW_END_LOCAL"; then
+  append_log_section "Recent runtime out log (tail 200)" 200 "$OUT_RUNTIME_PATH" || true
+  append_log_section "Recent runtime error log (tail 120)" 120 "$ERROR_RUNTIME_PATH" || true
 fi
 
 PROMPT=$(cat <<EOF
@@ -64,7 +140,7 @@ Please review the project at ${ROOT_DIR} based on the current code and recent ru
 
 Context:
 - Daily review time: ${NOW_LOCAL}
-- Review window: ${YESTERDAY_LOCAL} 01:00 ${TZ_NAME} -> ${TODAY_LOCAL} 01:00 ${TZ_NAME}
+- Review window: ${REVIEW_START_LOCAL} ${TZ_NAME} -> ${REVIEW_END_LOCAL} ${TZ_NAME}
 - Focus on recent logs, likely user-visible issues, operational problems, code quality, and opportunities for optimization or new features.
 - If there are safe, minimal fixes clearly warranted, you may make them. Otherwise provide a prioritized review and recommendations.
 - Write your full answer directly in Markdown so it can be appended to the report file at ${REPORT_PATH}.

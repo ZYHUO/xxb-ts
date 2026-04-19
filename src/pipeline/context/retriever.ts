@@ -56,7 +56,7 @@ async function retrieveSemantic(
  * Path 3: Thread trace — follow reply_to chain backwards.
  */
 async function retrieveThread(
-  chatId: number,
+  _chatId: number,
   message: FormattedMessage,
   maxDepth: number,
   allMessages: FormattedMessage[],
@@ -90,7 +90,7 @@ async function retrieveThread(
  * Extracts @username mentions from text.
  */
 async function retrieveEntity(
-  chatId: number,
+  _chatId: number,
   message: FormattedMessage,
   maxMessages: number,
   allMessages: FormattedMessage[],

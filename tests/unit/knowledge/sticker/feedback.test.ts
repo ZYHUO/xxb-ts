@@ -97,7 +97,7 @@ describe('StickerFeedback', () => {
 
     it('should return null for invalid intents', () => {
       expect(normalizeIntent('unknown_intent')).toBeNull();
-      expect(normalizeIntent('angry')).toBeNull();
+      expect(normalizeIntent('totally_fake_intent_xyz')).toBeNull();
       expect(normalizeIntent('')).toBeNull();
     });
 

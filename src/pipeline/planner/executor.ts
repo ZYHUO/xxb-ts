@@ -1,20 +1,19 @@
-import { buildToolSet } from '../tools/registry.js';
+import { executeValidatedToolStep } from '../tools/registry.js';
 import type { ExecutedToolStep, ToolPlan } from './types.js';
 
 export async function executeToolPlan(
   plan: ToolPlan,
   ctx: { chatId: number; userId: number },
 ): Promise<ExecutedToolStep[]> {
-  const tools = buildToolSet(ctx.chatId, ctx.userId) as Record<string, { execute?: (args: never) => Promise<unknown> | unknown }>;
   const executed: ExecutedToolStep[] = [];
 
   for (const step of plan.steps) {
-    const tool = tools[step.tool];
-    if (!tool?.execute) {
-      throw new Error(`Unknown or non-executable tool: ${step.tool}`);
-    }
-
-    const output = await tool.execute(step.args as never);
+    const output = await executeValidatedToolStep(
+      step.tool,
+      step.args,
+      ctx.chatId,
+      ctx.userId,
+    );
     executed.push({
       ...step,
       output,

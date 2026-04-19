@@ -7,9 +7,11 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import type { ZodTypeAny } from 'zod';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import { logger } from '../../shared/logger.js';
+import { assertUrlSsrfSafe, fetchUrlPinned } from './ssrf.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -42,6 +44,7 @@ const skillSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   parameters: paramSchema.default({}),
+  trusted: z.boolean().default(false),
   execute: z.discriminatedUnion('type', [httpExecuteSchema, scriptExecuteSchema]),
 });
 
@@ -82,20 +85,18 @@ function buildZodParams(params: ParamDef): z.ZodObject<Record<string, z.ZodTypeA
 async function executeHttp(
   exec: z.infer<typeof httpExecuteSchema>,
   params: Record<string, unknown>,
+  trusted = false,
 ): Promise<unknown> {
   const url = applyTemplate(exec.url, params);
-  const parsed = new URL(url);
-  const hostname = parsed.hostname;
-  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname) || hostname === '::1') {
-    throw new Error(`SSRF blocked: ${hostname}`);
-  }
-  const headers = exec.headers
+  if (!trusted) assertUrlSsrfSafe(url);
+
+  const headers: Record<string, string> = exec.headers
     ? Object.fromEntries(Object.entries(exec.headers).map(([k, v]) => [k, applyTemplate(v, params)]))
     : {};
 
-  const init: RequestInit = { method: exec.method, headers };
+  let body: string | undefined;
   if (exec.body && exec.method !== 'GET') {
-    init.body = JSON.stringify(
+    body = JSON.stringify(
       Object.fromEntries(
         Object.entries(exec.body).map(([k, v]) => [
           k,
@@ -103,13 +104,32 @@ async function executeHttp(
         ]),
       ),
     );
-    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  let statusCode: number;
+  let bodyText: string;
 
-  const data: unknown = await res.json();
+  if (trusted) {
+    const res = await fetch(url, { method: exec.method, headers, body, signal: AbortSignal.timeout(60_000) });
+    statusCode = res.status;
+    bodyText = await res.text();
+  } else {
+    const res = await fetchUrlPinned(url, { method: exec.method, headers, body, signal: AbortSignal.timeout(30_000), timeoutMs: 30_000, maxBytes: 2 * 1024 * 1024 });
+    statusCode = res.statusCode;
+    bodyText = res.body;
+  }
+
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(`HTTP ${statusCode}`);
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(bodyText) as unknown;
+  } catch {
+    throw new Error('Response is not valid JSON');
+  }
   return exec.resultPath ? getNestedValue(data, exec.resultPath) : data;
 }
 
@@ -128,29 +148,38 @@ async function executeScript(
 
 // ── Skill → Tool ──────────────────────────────────
 
-function skillToTool(skill: SkillDef): Tool {
-  return tool({
-    description: skill.description,
-    parameters: buildZodParams(skill.parameters),
-    execute: async (params: Record<string, unknown>) => {
-      try {
-        if (skill.execute.type === 'http') {
-          return await executeHttp(skill.execute, params);
-        } else {
-          return await executeScript(skill.execute, params);
+export interface LoadedSkillEntry {
+  tool: Tool;
+  parameterSchema: ZodTypeAny;
+}
+
+function skillEntry(skill: SkillDef): LoadedSkillEntry {
+  const parameterSchema = buildZodParams(skill.parameters);
+  return {
+    parameterSchema,
+    tool: tool({
+      description: skill.description,
+      parameters: parameterSchema,
+      execute: async (params: Record<string, unknown>) => {
+        try {
+          if (skill.execute.type === 'http') {
+            return await executeHttp(skill.execute, params, skill.trusted);
+          } else {
+            return await executeScript(skill.execute, params);
+          }
+        } catch (err) {
+          logger.warn({ err, skill: skill.name }, 'Skill execution failed');
+          return { error: err instanceof Error ? err.message : String(err) };
         }
-      } catch (err) {
-        logger.warn({ err, skill: skill.name }, 'Skill execution failed');
-        return { error: err instanceof Error ? err.message : String(err) };
-      }
-    },
-  });
+      },
+    }),
+  };
 }
 
 // ── Public API ────────────────────────────────────
 
-export async function loadSkills(skillsDir: string): Promise<Record<string, Tool>> {
-  const tools: Record<string, Tool> = {};
+export async function loadSkills(skillsDir: string): Promise<Record<string, LoadedSkillEntry>> {
+  const tools: Record<string, LoadedSkillEntry> = {};
 
   let files: string[];
   try {
@@ -180,7 +209,7 @@ export async function loadSkills(skillsDir: string): Promise<Record<string, Tool
         logger.warn({ name: skill.name }, 'Skill name conflicts with a built-in tool, skipping');
         continue;
       }
-      tools[skill.name] = skillToTool(skill);
+      tools[skill.name] = skillEntry(skill);
       logger.debug({ name: skill.name, file }, 'Loaded skill');
     } catch (err) {
       logger.warn({ err, file: filePath }, 'Failed to load skill, skipping');

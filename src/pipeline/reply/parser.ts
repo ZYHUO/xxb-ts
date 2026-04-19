@@ -4,16 +4,9 @@
 
 import { z } from 'zod';
 import { logger } from '../../shared/logger.js';
+import { ALLOWED_INTENTS } from '../../knowledge/sticker/types.js';
 
-const STICKER_INTENTS = [
-  'cute', 'comfort', 'tease', 'happy', 'sleepy',
-  'curious', 'playful', 'confused', 'shy', 'sad',
-  'smug', 'annoyed', 'dramatic', 'cozy', 'love',
-  'shocked', 'proud', 'laughing', 'pensive', 'excited',
-  'sarcastic', 'nervous', 'relieved', 'determined', 'mischievous',
-  'bored', 'disappointed', 'grateful', 'surprised', 'embarrassed',
-  'thinking', 'celebrating', 'crying_happy', 'rage', 'blank',
-] as const;
+const STICKER_INTENTS = ALLOWED_INTENTS;
 
 const stickerIntentEnum = z.enum(STICKER_INTENTS);
 

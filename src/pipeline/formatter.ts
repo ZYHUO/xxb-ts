@@ -94,11 +94,15 @@ function buildFullName(user: TgUser): string {
 function extractReplyTo(replyMsg: TgMessage): FormattedMessage['replyTo'] {
   const from = replyMsg.from;
   const text = replyMsg.text ?? replyMsg.caption ?? '';
+  const doc = replyMsg.document as { file_id?: string; mime_type?: string; file_name?: string } | undefined;
+  const photo = replyMsg.photo as Array<{ file_id: string }> | undefined;
   return {
     messageId: replyMsg.message_id,
     uid: from?.id ?? 0,
     fullName: from ? buildFullName(from) : 'Unknown',
     textSnippet: text.slice(0, 80),
+    ...(doc?.file_id && { documentFileId: doc.file_id, documentMimeType: doc.mime_type, documentFileName: doc.file_name }),
+    ...(photo?.length && { imageFileId: photo[photo.length - 1]!.file_id }),
   };
 }
 

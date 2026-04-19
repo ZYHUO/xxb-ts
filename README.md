@@ -39,9 +39,13 @@
 **基础设施**
 - 📦 **BullMQ 消息队列** — Redis 支撑的高并发处理（可配置并发数）
 - 🗃️ **双存储** — Redis（上下文、缓存、速率限制）+ SQLite（持久化、知识库、追踪）
-- 📊 **Admin Mini App** — Telegram WebApp HMAC 认证，运行时配置管理
-- ⏰ **Cron 定时任务** — 模型健康检查、日报生成、数据清理
-- 🔐 **安全防护** — SSRF 防护、速率限制、Redis Lua 原子操作、去重锁
+- 📊 **Admin Mini App** — Telegram WebApp HMAC 认证，macOS 窗口风格 UI，运行时配置管理
+- ⏰ **Cron 定时任务** — 模型健康检查、用户画像同步、空闲主动消息、频道抓取、数据清理（并发保护）
+- 🔐 **安全防护** — SSRF 防护、webhook constant-time 验证、速率限制、Redis Lua 原子操作、去重锁
+- 📡 **频道消息源** — 自动抓取公开 Telegram 频道内容存入 ChromaDB，无需管理员权限
+- 🌐 **Cloudflare 绕过** — CF_FETCH skill 自动三级降级（直连 → Playwright+Xvfb → DrissionPage）
+- 🔌 **Skill 插件系统** — data/skills/*.json 添加自定义工具，支持 HTTP 调用，内置 SSRF 防护
+- 🎨 **359 个贴纸意图** — AI 自主选择贴纸，覆盖情绪/社交/群聊/猫娘等场景
 
 ### 🏗️ 架构
 

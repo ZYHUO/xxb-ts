@@ -580,671 +580,185 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="tg-page">
-    <!-- Header -->
-    <div class="tg-header-section">
-      <h1 class="tg-page-title">白名单管理</h1>
-      <div class="tg-status-row">
-        <span :class="['tg-badge', managedEnabled ? 'tg-badge-active' : 'tg-badge-muted']">
-          {{ managedEnabled ? '审核制' : '未启用' }}
-        </span>
-        <span :class="['tg-badge', isMaster ? 'tg-badge-accent' : 'tg-badge-muted']">
-          {{ isMaster ? '管理员' : '申请者' }}
-        </span>
-        <span v-if="isMaster && manualQueue.length" class="tg-badge tg-badge-destructive">
-          {{ manualQueue.length }} 待办
-        </span>
+  <div class="window-container">
+    <div class="terminal-window">
+      <!-- Title Bar -->
+      <div class="terminal-titlebar">
+        <div class="traffic-lights">
+          <span class="dot dot-close"></span>
+          <span class="dot dot-minimize"></span>
+          <span class="dot dot-maximize"></span>
+        </div>
+        <div class="terminal-title">
+          <span class="accent">啾咪囝</span> Admin
+        </div>
+        <div class="titlebar-user">
+          <span :class="['badge', isMaster ? 'badge-accent' : 'badge-muted']">
+            {{ isMaster ? '管理员' : '申请者' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Step Bar (Gloria style) -->
+      <nav class="step-bar">
+        <button :class="['step', { active: activeTab === 'apply' }]" @click="activeTab = 'apply'">申请</button>
+        <template v-if="isMaster">
+          <span class="step-arrow">›</span>
+          <button :class="['step', { active: activeTab === 'review' }]" @click="activeTab = 'review'">
+            审核<span v-if="manualQueue.length" class="step-badge">{{ manualQueue.length }}</span>
+          </button>
+          <span class="step-arrow">›</span>
+          <button :class="['step', { active: activeTab === 'settings' }]" @click="activeTab = 'settings'">设置</button>
+        </template>
+      </nav>
+
+      <!-- Content -->
+      <div class="window-content">
+        <div class="shop-content">
+        <!-- Loading -->
+        <div v-if="state.loading" class="card">
+          <div v-for="n in 4" :key="n" style="padding: 8px 0;">
+            <span class="skeleton-bar" :style="{ width: n === 1 ? '55%' : n === 2 ? '72%' : '88%' }" />
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div v-else-if="state.loadError" class="card">
+          <div class="card-title" style="margin-bottom:8px">无法完成初始化</div>
+          <span class="text-error">{{ state.loadError }}</span>
+        </div>
+
+        <template v-else>
+          <!-- ===== Tab: 申请 ===== -->
+          <div v-show="activeTab === 'apply'" class="tab-panel">
+            <!-- Status badges -->
+            <div class="status-badges">
+              <span :class="['badge', managedEnabled ? 'badge-success' : 'badge-muted']">
+                {{ managedEnabled ? '审核制' : '未启用' }}
+              </span>
+              <span v-if="isMaster && manualQueue.length" class="badge badge-error">
+                {{ manualQueue.length }} 待办
+              </span>
+            </div>
+
+            <!-- Submit form -->
+            <div class="section-label">提交申请</div>
+            <div class="card">
+              <div v-if="!managedEnabled" style="padding:4px 0">
+                <span class="text-hint">名单审核未开启，暂时无法提交。</span>
+              </div>
+
+              <div v-if="suggestedChatId" class="form-row">
+                <span class="form-row-label">当前群</span>
+                <span class="form-row-value text-accent">{{ suggestedChatId }}</span>
+              </div>
+              <div v-if="suggestedChatTitle" style="font-size:12px;color:var(--muted);margin-bottom:8px">{{ suggestedChatTitle }}</div>
+
+              <div style="margin-bottom:10px">
+                <label class="form-label">群号</label>
+                <input v-model="form.chatId" class="form-input" type="text" inputmode="numeric" placeholder="10 位数字 / -100…" autocomplete="off" />
+                <div v-if="chatIdHint" class="text-error" style="margin-top:4px;font-size:12px">{{ chatIdHint }}</div>
+              </div>
+
+              <div>
+                <label class="form-label">说明</label>
+                <textarea v-model="form.note" class="form-textarea" rows="3" maxlength="500" placeholder="选填"></textarea>
+              </div>
+
+              <div v-if="!chatIdHint" style="font-size:12px;color:var(--muted);margin-top:8px">填写群号后可提交申请。</div>
+            </div>
+
+            <!-- Inline submit -->
+            <div v-if="!tg?.MainButton" style="margin-bottom:10px">
+              <button class="btn btn-primary btn-full" :disabled="!canSubmit || state.submitBusy" @click="submitApplication">
+                {{ state.submitBusy ? '提交中…' : '提交申请' }}
+              </button>
+            </div>
+
+            <!-- Feedback -->
+            <div v-if="state.submitMessage" :class="['banner', state.submitTone === 'success' ? 'banner-success' : 'banner-danger']">
+              {{ state.submitMessage }}
+            </div>
+
+            <!-- My submissions -->
+            <template v-if="!isMaster && state.mySubmissions">
+              <div class="section-label">我的申请</div>
+              <div v-if="!mySubmissionRows.length" class="card">
+                <span class="text-hint">暂无提交记录。</span>
+              </div>
+              <div v-for="(row, idx) in mySubmissionRows" :key="`${row.kind}-${row.item.request_id ?? row.item.chat_id ?? idx}`" class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+                  <strong style="font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ submissionLineTitle(row) }}</strong>
+                  <span class="text-hint" style="flex-shrink:0;font-size:12px">{{ row.item.chat_id }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+                  <template v-if="row.kind === 'pending'"><span class="badge badge-warn">待审核</span></template>
+                  <template v-else-if="row.kind === 'reviewed'"><span class="badge badge-error">已拒绝</span></template>
+                  <template v-else>
+                    <span class="badge badge-success">已通过</span>
+                    <span :class="['badge', row.item.enabled ? 'badge-success' : 'badge-muted']">{{ row.item.enabled ? '已启用' : '未启用' }}</span>
+                  </template>
+                </div>
+                <span class="text-hint" style="font-size:12px">{{ formatTimestamp(row.ts) }}</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- ===== Tab: 审核 ===== -->
+          <div v-show="activeTab === 'review'" class="tab-panel">
+            <AdminReviewPanel
+              v-if="isMaster"
+              :manual-queue="manualQueue"
+              :ai-approved="aiApproved"
+              :groups="groups"
+              :admin-busy-key="state.adminBusyKey"
+              :admin-message="state.adminMessage"
+              :admin-tone="state.adminTone"
+              @refresh="onAdminRefresh"
+              @approve="(item) => runAdminAction(`approve:${item.request_id}`, 'approve', { request_id: item.request_id, enable_now: false }, '申请已通过。')"
+              @approve-enable="(item) => runAdminAction(`approve_on:${item.request_id}`, 'approve', { request_id: item.request_id, enable_now: true }, '申请已通过并立即启用。')"
+              @reject="(item) => runAdminAction(`reject:${item.request_id}`, 'reject', { request_id: item.request_id }, '申请已拒绝。')"
+              @ai-review="(item) => runAdminAction(`ai_review:${item.request_id}`, 'ai_review', { request_id: item.request_id }, 'AI 审核已完成。')"
+              @toggle-group="(group) => runAdminAction(`toggle:${group.chat_id}`, 'set_enabled', { chat_id: group.chat_id, enabled: !group.enabled }, group.enabled ? '机器人已关闭。' : '机器人已启用。')"
+              @remove-group="(group) => runAdminAction(`remove:${group.chat_id}`, 'remove_group', { chat_id: group.chat_id }, '已从名单中移除该群。')"
+              @check-group-permissions="checkGroupPermissions"
+            />
+          </div>
+
+          <!-- ===== Tab: 设置 ===== -->
+          <div v-show="activeTab === 'settings'" class="tab-panel">
+            <ModelRoutingPanel
+              v-if="isMaster && modelRouting"
+              :model-routing="modelRouting"
+              :busy="state.modelRoutingBusy"
+              :validation-result="state.providerValidationResult"
+              @validate-provider="validateProvider"
+            />
+            <HealthStatusPanel v-if="isMaster" :health="state.health" :error="state.healthError" />
+            <ModelStatusBar :init-data="tg?.initData ?? ''" />
+          </div>
+        </template>
+        </div><!-- .shop-content -->
+      </div>
+
+      <!-- Footer (Gloria style) -->
+      <div class="shop-footer">
+        Powered by <span class="accent">&nbsp;啾咪囝</span>
       </div>
     </div>
-
-    <!-- Loading -->
-    <section v-if="state.loading" class="tg-section tg-skeleton-section">
-      <div v-for="n in 4" :key="n" class="tg-cell tg-skeleton-cell">
-        <span class="tg-skeleton-bar" :style="{ width: n === 1 ? '55%' : n === 2 ? '72%' : '88%' }" />
-      </div>
-    </section>
-
-    <!-- Error -->
-    <section v-else-if="state.loadError" class="tg-section">
-      <div class="tg-section-header">无法完成初始化</div>
-      <div class="tg-cell">
-        <span class="tg-destructive">{{ state.loadError }}</span>
-      </div>
-    </section>
-
-    <template v-else>
-      <!-- ===== Tab: 申请 ===== -->
-      <div v-show="activeTab === 'apply'" :class="{ 'reveal-in': revealStep >= 2 }">
-      <!-- Submit Section -->
-      <div class="tg-section-header">提交申请</div>
-      <section class="tg-section">
-        <div v-if="!managedEnabled" class="tg-cell">
-          <span class="tg-hint">名单审核未开启，暂时无法提交。</span>
-        </div>
-
-        <div v-if="suggestedChatId" class="tg-cell tg-cell-multi">
-          <div class="tg-cell-row">
-            <span class="tg-cell-label">当前群</span>
-            <span class="tg-cell-value">{{ suggestedChatId }}</span>
-          </div>
-          <span v-if="suggestedChatTitle" class="tg-cell-subtitle">{{ suggestedChatTitle }}</span>
-        </div>
-
-        <label class="tg-cell tg-cell-input">
-          <span class="tg-cell-label">群号</span>
-          <input
-            v-model="form.chatId"
-            type="text"
-            inputmode="numeric"
-            placeholder="10 位数字 / -100…"
-            autocomplete="off"
-          />
-        </label>
-        <div v-if="chatIdHint" class="tg-section-footer tg-chatid-hint">{{ chatIdHint }}</div>
-
-        <label class="tg-cell tg-cell-input tg-cell-textarea">
-          <span class="tg-cell-label">说明</span>
-          <textarea
-            v-model="form.note"
-            rows="3"
-            maxlength="500"
-            placeholder="选填"
-          ></textarea>
-        </label>
-      </section>
-      <div v-if="!chatIdHint" class="tg-section-footer">填写群号后可点击底部按钮提交申请。</div>
-
-      <!-- Inline submit for non-TG environments -->
-      <section v-if="!tg?.MainButton" class="tg-section">
-        <button
-          class="tg-button-full"
-          :disabled="!canSubmit || state.submitBusy"
-          @click="submitApplication"
-        >
-          {{ state.submitBusy ? '提交中…' : '提交申请' }}
-        </button>
-      </section>
-
-      <!-- Submit feedback -->
-      <div v-if="state.submitMessage" :class="['tg-banner', `tg-banner-${state.submitTone}`]">
-        {{ state.submitMessage }}
-      </div>
-
-      <!-- My submissions (applicants) -->
-      <template v-if="!isMaster && state.mySubmissions">
-        <div class="tg-section-header">我的申请</div>
-        <section class="tg-section">
-          <div v-if="!mySubmissionRows.length" class="tg-cell tg-cell-center">
-            <span class="tg-hint">暂无提交记录。</span>
-          </div>
-          <template v-else>
-            <div
-              v-for="(row, idx) in mySubmissionRows"
-              :key="`${row.kind}-${row.item.request_id ?? row.item.chat_id ?? idx}`"
-              class="tg-cell tg-cell-multi tg-submission-cell"
-            >
-              <div class="tg-cell-row">
-                <strong class="tg-submission-title">{{ submissionLineTitle(row) }}</strong>
-                <span class="tg-cell-value tg-submission-cid">{{ row.item.chat_id }}</span>
-              </div>
-              <div class="tg-submission-badges">
-                <template v-if="row.kind === 'pending'">
-                  <span class="tg-badge tg-badge-muted">待审核</span>
-                </template>
-                <template v-else-if="row.kind === 'reviewed'">
-                  <span class="tg-badge tg-badge-destructive">已拒绝</span>
-                </template>
-                <template v-else>
-                  <span class="tg-badge tg-badge-active">已通过</span>
-                  <span
-                    :class="['tg-badge', row.item.enabled ? 'tg-badge-active' : 'tg-badge-muted']"
-                  >
-                    {{ row.item.enabled ? '已启用' : '未启用' }}
-                  </span>
-                </template>
-              </div>
-              <span class="tg-cell-subtitle">{{ formatTimestamp(row.ts) }}</span>
-            </div>
-          </template>
-        </section>
-      </template>
-
-      </div>
-
-      <!-- ===== Tab: 审核 ===== -->
-      <div v-show="activeTab === 'review'" :class="{ 'reveal-in': revealStep >= 3 }">
-      <!-- Admin Panel -->
-      <AdminReviewPanel
-        v-if="isMaster"
-        :manual-queue="manualQueue"
-        :ai-approved="aiApproved"
-        :groups="groups"
-        :admin-busy-key="state.adminBusyKey"
-        :admin-message="state.adminMessage"
-        :admin-tone="state.adminTone"
-        @refresh="onAdminRefresh"
-        @approve="(item) => runAdminAction(`approve:${item.request_id}`, 'approve', { request_id: item.request_id, enable_now: false }, '申请已通过。')"
-        @approve-enable="(item) => runAdminAction(`approve_on:${item.request_id}`, 'approve', { request_id: item.request_id, enable_now: true }, '申请已通过并立即启用。')"
-        @reject="(item) => runAdminAction(`reject:${item.request_id}`, 'reject', { request_id: item.request_id }, '申请已拒绝。')"
-        @ai-review="(item) => runAdminAction(`ai_review:${item.request_id}`, 'ai_review', { request_id: item.request_id }, 'AI 审核已完成。')"
-        @toggle-group="(group) => runAdminAction(`toggle:${group.chat_id}`, 'set_enabled', { chat_id: group.chat_id, enabled: !group.enabled }, group.enabled ? '机器人已关闭。' : '机器人已启用。')"
-        @remove-group="(group) => runAdminAction(`remove:${group.chat_id}`, 'remove_group', { chat_id: group.chat_id }, '已从名单中移除该群。')"
-        @check-group-permissions="checkGroupPermissions"
-      />
-
-      </div>
-
-      <!-- ===== Tab: 设置 ===== -->
-      <div v-show="activeTab === 'settings'" :class="{ 'reveal-in': revealStep >= 3 }">
-      <ModelRoutingPanel
-        v-if="isMaster && modelRouting"
-        :model-routing="modelRouting"
-        :busy="state.modelRoutingBusy"
-        :validation-result="state.providerValidationResult"
-        @validate-provider="validateProvider"
-      />
-
-      <HealthStatusPanel
-        v-if="isMaster"
-        :health="state.health"
-        :error="state.healthError"
-      />
-
-      <!-- Model Status -->
-      <ModelStatusBar :init-data="tg?.initData ?? ''" />
-      </div>
-    </template>
-
-    <!-- Bottom Tab Bar -->
-    <nav class="tab-bar" :class="{ 'reveal-in': revealStep >= 4 }">
-      <button
-        :class="['tab-item', { 'tab-active': activeTab === 'apply' }]"
-        @click="activeTab = 'apply'"
-      >
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        <span>申请</span>
-      </button>
-      <button
-        v-if="isMaster"
-        :class="['tab-item', { 'tab-active': activeTab === 'review' }]"
-        @click="activeTab = 'review'"
-      >
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        <span>审核</span>
-        <span v-if="manualQueue.length" class="tab-badge">{{ manualQueue.length }}</span>
-      </button>
-      <button
-        v-if="isMaster"
-        :class="['tab-item', { 'tab-active': activeTab === 'settings' }]"
-        @click="activeTab = 'settings'"
-      >
-        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>设置</span>
-      </button>
-    </nav>
-  </main>
+  </div>
 </template>
 
 <style>
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', 'Noto Sans SC', sans-serif;
-  font-size: 15px;
-  line-height: 1.35;
-  color: var(--tg-theme-text-color, #000000);
-  background: var(--tg-theme-secondary-bg-color, #efeff4);
-  -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-}
-
-button, input, textarea {
-  font: inherit;
-  color: inherit;
-}
-
-.tg-page {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 0 0 100px;
-}
-
-/* ── Header ── */
-.tg-header-section {
-  padding: 16px 16px 12px;
-}
-
-.tg-page-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+/* App-level overrides — theme.css provides the base */
+.status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 10px;
 }
 
-.tg-status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.tab-panel {
+  animation: pageFadeIn var(--anim-speed, 0.35s) ease;
 }
-
-.tg-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.tg-badge-active {
-  background: var(--tg-theme-button-color, #007aff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-}
-
-.tg-badge-accent {
-  background: color-mix(in srgb, var(--tg-theme-accent-text-color, #007aff) 15%, transparent);
-  color: var(--tg-theme-accent-text-color, #007aff);
-}
-
-.tg-badge-muted {
-  background: color-mix(in srgb, var(--tg-theme-hint-color, #8e8e93) 15%, transparent);
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.tg-badge-destructive {
-  background: color-mix(in srgb, var(--tg-theme-destructive-text-color, #ff3b30) 15%, transparent);
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-}
-
-/* ── Section / Cell (Telegram native list style) ── */
-.tg-section-header {
-  padding: 8px 24px 6px;
-  font-size: 13px;
-  font-weight: 400;
-  text-transform: uppercase;
-  color: var(--tg-theme-section-header-text-color, var(--tg-theme-hint-color, #8e8e93));
-}
-
-.tg-section-footer {
-  padding: 6px 24px 8px;
-  font-size: 13px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.tg-section {
-  background: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
-  border: 0.5px solid var(--tg-theme-section-separator-color, rgba(0,0,0,0.08));
-  border-radius: 14px;
-  margin: 0 12px;
-  overflow: hidden;
-}
-
-.tg-section + .tg-section-header {
-  margin-top: 24px;
-}
-
-.tg-section + .tg-section-footer {
-  margin-top: 0;
-}
-
-.tg-section-footer + .tg-section-header {
-  margin-top: 24px;
-}
-
-.tg-section + .tg-section {
-  margin-top: 24px;
-}
-
-/* ── Cells ── */
-.tg-cell {
-  padding: 11px 16px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.tg-cell + .tg-cell {
-  border-top: 0.5px solid var(--tg-theme-section-separator-color, rgba(0,0,0,0.08));
-}
-
-.tg-cell-center {
-  justify-content: center;
-}
-
-.tg-cell-multi {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-}
-
-.tg-cell-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.tg-cell-label {
-  font-size: 15px;
-  color: var(--tg-theme-text-color, #000000);
-  flex-shrink: 0;
-}
-
-.tg-cell-value {
-  font-size: 15px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-  text-align: right;
-  word-break: break-all;
-}
-
-.tg-cell-subtitle {
-  font-size: 13px;
-  color: var(--tg-theme-subtitle-text-color, var(--tg-theme-hint-color, #8e8e93));
-}
-
-/* ── Input cells ── */
-.tg-cell-input {
-  cursor: text;
-  gap: 12px;
-}
-
-.tg-cell-input input,
-.tg-cell-input textarea {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 15px;
-  color: var(--tg-theme-text-color, #000000);
-  text-align: right;
-  min-width: 0;
-}
-
-.tg-cell-input input::placeholder,
-.tg-cell-input textarea::placeholder {
-  color: var(--tg-theme-hint-color, #8e8e93);
-  opacity: 0.6;
-}
-
-.tg-cell-textarea {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-
-.tg-cell-textarea textarea {
-  text-align: left;
-  resize: vertical;
-  min-height: 60px;
-  line-height: 1.4;
-}
-
-/* ── Hint / destructive text ── */
-.tg-hint {
-  font-size: 15px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.tg-destructive {
-  font-size: 15px;
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-}
-
-/* ── Banner (feedback) ── */
-.tg-banner {
-  margin: 8px 12px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.tg-banner-success {
-  background: color-mix(in srgb, #34c759 12%, var(--tg-theme-bg-color, #ffffff));
-  color: #248a3d;
-}
-
-.tg-banner-danger {
-  background: color-mix(in srgb, var(--tg-theme-destructive-text-color, #ff3b30) 12%, var(--tg-theme-bg-color, #ffffff));
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-}
-
-/* ── Full-width button (fallback when no MainButton) ── */
-.tg-button-full {
-  width: 100%;
-  padding: 14px 16px;
-  border: none;
-  border-radius: 12px;
-  background: var(--tg-theme-button-color, #007aff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.tg-button-full:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.tg-button-full:active:not(:disabled) {
-  opacity: 0.7;
-}
-
-/* ── Inline action buttons (admin, permission check) ── */
-.tg-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.tg-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.tg-button:active:not(:disabled) {
-  opacity: 0.7;
-}
-
-.tg-button-primary {
-  background: var(--tg-theme-button-color, #007aff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-}
-
-.tg-button-secondary {
-  background: color-mix(in srgb, var(--tg-theme-button-color, #007aff) 12%, transparent);
-  color: var(--tg-theme-button-color, #007aff);
-}
-
-.tg-button-danger {
-  background: color-mix(in srgb, var(--tg-theme-destructive-text-color, #ff3b30) 12%, transparent);
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-}
-
-.tg-button-plain {
-  background: var(--tg-theme-bg-color, #ffffff);
-  color: var(--tg-theme-text-color, #000000);
-  border: 0.5px solid var(--tg-theme-section-separator-color, rgba(0,0,0,0.12));
-}
-
-/* ── Skeleton loading ── */
-@keyframes tg-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.38;
-  }
-  50% {
-    opacity: 0.72;
-  }
-}
-
-.tg-skeleton-section .tg-skeleton-cell {
-  min-height: 48px;
-}
-
-.tg-skeleton-bar {
-  display: block;
-  height: 13px;
-  border-radius: 6px;
-  max-width: 100%;
-  background: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.1));
-  animation: tg-skeleton-pulse 0.8s ease-in-out infinite;
-}
-
-.tg-chatid-hint {
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-  padding-top: 0;
-  margin-top: -4px;
-}
-
-.tg-submission-cell + .tg-submission-cell {
-  border-top: 0.5px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
-}
-
-.tg-submission-title {
-  font-size: 15px;
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tg-submission-cid {
-  flex-shrink: 0;
-  max-width: 42%;
-  word-break: break-all;
-}
-
-.tg-submission-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-self: flex-start;
-}
-
-/* ===== Bottom Tab Bar ===== */
-.tg-page {
-  padding-bottom: 72px;
-}
-.tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  height: 56px;
-  background: var(--tg-theme-secondary-bg-color, #f2f2f7);
-  border-top: 0.5px solid var(--tg-theme-section-separator-color, rgba(0,0,0,.12));
-  border-radius: 18px 18px 0 0;
-  z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-.tab-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  border: none;
-  background: none;
-  color: var(--tg-theme-hint-color, #8e8e93);
-  font-size: 10px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 6px 16px;
-  position: relative;
-  transition: color .15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.tab-item.tab-active {
-  color: var(--tg-theme-button-color, #007aff);
-}
-.tab-icon {
-  width: 22px;
-  height: 22px;
-}
-.tab-badge {
-  position: absolute;
-  top: 2px;
-  right: 6px;
-  min-width: 16px;
-  height: 16px;
-  line-height: 16px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--tg-theme-destructive-text-color, #ff3b30);
-  border-radius: 8px;
-  padding: 0 4px;
-}
-
-/* ===== Lightweight Animations ===== */
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-
-
-/* Tab content transition */
-[v-show] {
-  transition: opacity .15s ease;
-}
-
-/* Button press effect */
-.tg-button-full:active:not(:disabled),
-.tab-item:active {
-  transform: scale(0.97);
-  transition: transform .1s ease;
-}
-
-/* Badge subtle bounce on appear */
-.tg-badge {
-  transition: transform .15s ease, opacity .15s ease;
-}
-
-/* Smooth skeleton pulse */
-.tg-skeleton-bar {
-  border-radius: 8px;
-}
-
-/* Section hover/touch feedback */
-.tg-cell {
-  transition: background-color .12s ease;
-}
-
-
-/* ===== Progressive Reveal ===== */
-.tab-bar {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.reveal-in {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  transition: opacity .12s ease-out, transform .12s ease-out;
-}
-
-/* Remove old section-level animation (replaced by progressive reveal) */
 </style>

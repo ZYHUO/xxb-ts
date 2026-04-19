@@ -11,7 +11,10 @@ import { getDynamicKnowledge, updateKnowledge } from '../knowledge/manager.js';
 import { getAll } from '../pipeline/context/manager.js';
 import { getConfig, loadPrompt } from '../shared/config.js';
 import { env } from '../env.js';
+import { getRedis } from '../db/redis.js';
 import { logger } from '../shared/logger.js';
+
+const CTX_PREFIX = 'xxb:ctx:';
 
 function stableStringifyContext(messages: unknown[]): string {
   return JSON.stringify(messages);
@@ -47,9 +50,28 @@ function saveHashes(hashes: Record<string, string>): void {
 
 export async function runKnowledgeSync(): Promise<void> {
   const e = env();
-  const chatIds = e.KNOWLEDGE_CRON_CHAT_IDS;
+
+  // Auto-discover all active group chats from Redis context keys
+  // Fall back to explicit list if configured
+  let chatIds: number[];
+  if (e.KNOWLEDGE_CRON_CHAT_IDS.length > 0) {
+    chatIds = e.KNOWLEDGE_CRON_CHAT_IDS;
+  } else {
+    const redis = getRedis();
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, found] = await redis.scan(cursor, 'MATCH', `${CTX_PREFIX}*`, 'COUNT', '200');
+      cursor = next;
+      keys.push(...found);
+    } while (cursor !== '0');
+    chatIds = keys
+      .map((k) => parseInt(k.slice(CTX_PREFIX.length), 10))
+      .filter((id) => !Number.isNaN(id) && id < 0); // negative = group chat
+  }
+
   if (!chatIds.length) {
-    logger.debug('Knowledge sync cron: KNOWLEDGE_CRON_CHAT_IDS empty, skip');
+    logger.debug('Knowledge sync cron: no active group chats found, skip');
     return;
   }
 

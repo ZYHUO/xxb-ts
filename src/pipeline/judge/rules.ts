@@ -109,7 +109,7 @@ const REMEMBER_PATTERN =
   /帮[我俺]?记(?:住|一下|下来?)|记(?:住|下来?)(?:一下)?[：:，,]|keep\s+in\s+mind|记得(?:一下)?[：:，,]/i;
 
 const VIEW_PREFS_PATTERN =
-  /(?:你|帮我?)?记(?:住|得)了?(?:什么|哪些|啥)|(?:我的|我让你记的)(?:偏好|记忆|备忘)/i;
+  /(?:你|帮我?)记(?:住|得)了(?:什么|哪些|啥)|(?:我的|我让你记的)(?:偏好|备忘)|我让你记的/i;
 const FORGET_PATTERN = /忘(?:掉|了|记)?[：:，,\s]*\S|别记了|不用记了|forget/i;
 
 // 轻度禁言：只接受短句、直接命令式表达，避免“提到关键词”误触发
@@ -330,20 +330,20 @@ export function evaluateRules(ctx: RuleContext): JudgeResult | null {
     if (looksLikeForgetRequest(text)) {
       return makeResult("REPLY", "forget_request");
     }
-    return makeResult("REPLY", "private_chat");
+    return makeResult("REPLY", "private_chat", { skipPathResolution: true });
   }
 
   // 6. Hot chat — 概率降级而非直接沉默
   // 20-40条/5min：60% 概率跳过；>40条：100% 跳过
-  if (groupActivity.messagesLast5Min >= 20) {
+  if (groupActivity.messagesLast5Min >= 10) {
     const skip =
-      groupActivity.messagesLast5Min >= 40 ? true : Math.random() < 0.6;
+      groupActivity.messagesLast5Min >= 25 ? true : Math.random() < 0.7;
     if (skip) return makeResult("IGNORE", "hot_chat");
   }
 
   // 7. Recent reply (last bot reply within 5 messages) AND not mentioned → IGNORE
-  // lastBotReplyIndex = 0 means bot was the last message; < 5 means within the last 5 messages.
-  if (lastBotReplyIndex >= 0 && lastBotReplyIndex < 5) {
+  // lastBotReplyIndex = 0 means bot was the last message; < 10 means within the last 10 messages.
+  if (lastBotReplyIndex >= 0 && lastBotReplyIndex < 10) {
     return makeResult("IGNORE", "recent_reply");
   }
 

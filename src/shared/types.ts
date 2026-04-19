@@ -19,7 +19,7 @@ export interface FormattedMessage {
     isAnimated?: boolean;
     isVideo?: boolean;
   };
-  replyTo?: { messageId: number; uid: number; fullName: string; textSnippet: string };
+  replyTo?: { messageId: number; uid: number; fullName: string; textSnippet: string; documentFileId?: string; documentMimeType?: string; documentFileName?: string; imageFileId?: string };
   isForwarded: boolean;
   forwardFrom?: string;
   imageFileId?: string;

@@ -32,6 +32,7 @@ import {
   recordUserMessage,
   saveUserPreference,
   getUserPreferences,
+  getUserProfilePrompt,
   deleteUserPreference,
   getMuteState,
   muteUser,
@@ -69,6 +70,20 @@ import { logger } from "../shared/logger.js";
 import { parseMuteTimedRequest } from "./judge/rules.js";
 
 const sender = new StreamingSender();
+const _recentStickerIds = new Set<string>();
+const _recentStickerQueue: string[] = [];
+const MAX_RECENT_STICKERS = 50;
+let _repliesSinceLastSticker = 0;
+const STICKER_COOLDOWN_REPLIES = 6; // only allow sticker every N replies
+function _trackRecentSticker(id: string): void {
+  _recentStickerIds.add(id);
+  _recentStickerQueue.push(id);
+  if (_recentStickerQueue.length > MAX_RECENT_STICKERS) {
+    const old = _recentStickerQueue.shift()!;
+    _recentStickerIds.delete(old);
+  }
+  _repliesSinceLastSticker = 0;
+}
 const TEMP_MUTE_CLEAR_RULES = new Set([
   "reply_to_self",
   "reply_to_self_lookup",
@@ -185,6 +200,34 @@ export async function processPipeline(job: ChatJob): Promise<void> {
           : Promise.resolve(),
       ]);
       timings["media"] = Math.round(performance.now() - tmedia);
+    }
+
+    // 2.9 ReplyTo attachment — if user replies to a message with a file/image, process it
+    if (formatted.replyTo && !formatted.documentFileId && !formatted.imageFileId) {
+      if (formatted.replyTo.documentFileId) {
+        formatted.documentFileId = formatted.replyTo.documentFileId;
+        formatted.documentMimeType = formatted.replyTo.documentMimeType;
+        formatted.documentFileName = formatted.replyTo.documentFileName;
+        try {
+          const desc = await describeMultimodal(formatted);
+          if (desc) {
+            formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + desc : desc).trim();
+          }
+        } catch (err) {
+          logger.warn({ err }, "ReplyTo document processing failed, continuing");
+        }
+        // Clear so it doesn't get processed again
+        formatted.documentFileId = undefined;
+      } else if (formatted.replyTo.imageFileId) {
+        try {
+          const description = await describeImage(formatted.replyTo.imageFileId);
+          if (description) {
+            formatted.imageDescriptions = [description];
+          }
+        } catch (err) {
+          logger.warn({ err }, "ReplyTo image processing failed, continuing");
+        }
+      }
     }
 
     // 3. Save to context
@@ -727,9 +770,11 @@ export async function processPipeline(job: ChatJob): Promise<void> {
     // 5.61 View preferences request
     if (judgeResult.rule === "view_prefs_request" && !formatted.isAnonymous) {
       const prefs = getUserPreferences(job.chatId, formatted.uid);
-      const reply = prefs
-        ? `本喵记住了这些喵~\n${prefs}`
-        : "本喵还没记住什么呢喵~";
+      const profile = getUserProfilePrompt(job.chatId, formatted.uid);
+      const parts: string[] = [];
+      if (profile) parts.push(`🧠 本喵对你的印象：\n${profile}`);
+      if (prefs) parts.push(`📝 你让本喵记住的：\n${prefs}`);
+      const reply = parts.length > 0 ? parts.join('\n\n') : '本喵还没记住什么呢喵~';
       await sender.sendDirect(job.chatId, reply, formatted.messageId);
       return;
     }
@@ -905,13 +950,16 @@ export async function processPipeline(job: ChatJob): Promise<void> {
             stickerPolicy.mode !== "off" &&
             reply.stickerIntent &&
             reply.stickerIntent.length > 0 &&
-            Math.random() < 0.15
+            _repliesSinceLastSticker >= STICKER_COOLDOWN_REPLIES
           ) {
             const candidates = getReadyStickersByIntent(reply.stickerIntent);
             if (candidates.length > 0) {
               candidates.sort((a, b) => b.score - a.score);
-              const pool = candidates.slice(0, 3);
+              // Exclude recently sent stickers, pick from top 10
+              const fresh = candidates.filter((c) => !_recentStickerIds.has(c.fileUniqueId));
+              const pool = (fresh.length > 0 ? fresh : candidates).slice(0, 10);
               const picked = pool[Math.floor(Math.random() * pool.length)]!;
+              _trackRecentSticker(picked.fileUniqueId);
               stickerFileId = picked.fileId;
               stickerFileUniqueId = picked.fileUniqueId;
               stickerIntent = reply.stickerIntent[0];
@@ -935,19 +983,37 @@ export async function processPipeline(job: ChatJob): Promise<void> {
               ? undefined
               : reply.targetMessageId;
 
-          const sent = await sender.sendDirect(job.chatId, reply.replyContent, replyToId);
+          // Sticker-only reply: skip text, just send sticker
+          const isStickerOnly = reply.replyContent.trim() === '[sticker]' && stickerFileId;
 
-          if (stickerFileId && stickerPolicy.sendPosition === "after") {
+          if (!isStickerOnly) {
+            const sent = await sender.sendDirect(job.chatId, reply.replyContent, replyToId);
+
+            if (stickerFileId && stickerPolicy.sendPosition === "after") {
+              const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
+                logger.warn({ err, chatId: job.chatId }, "Sticker send (after) failed, continuing");
+                return undefined;
+              });
+              if (stickerMsgId && stickerFileUniqueId) {
+                recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
+              }
+            }
+
+            return { messageId: sent.messageId, text: reply.replyContent };
+          }
+
+          // Sticker-only: just send sticker
+          if (stickerFileId) {
             const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
-              logger.warn({ err, chatId: job.chatId }, "Sticker send (after) failed, continuing");
+              logger.warn({ err, chatId: job.chatId }, "Sticker-only send failed");
               return undefined;
             });
             if (stickerMsgId && stickerFileUniqueId) {
               recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
             }
+            return { messageId: stickerMsgId ?? 0, text: '[sticker]' };
           }
-
-          return { messageId: sent.messageId, text: reply.replyContent };
+          return { messageId: 0, text: '' };
         }),
       );
 
@@ -956,6 +1022,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
         const result = sendResults[replyIdx]!;
         if (result.status === "fulfilled") {
           sentMessages.push(result.value);
+          _repliesSinceLastSticker++;
         } else {
           logger.error(
             { chatId: job.chatId, targetMessageId: replies[replyIdx]!.targetMessageId, err: result.reason },

@@ -96,6 +96,127 @@ async function callClaude(
   };
 }
 
+// ── OpenAI-compatible message serialization ───────────────────────
+
+/** Check if any message contains image content parts */
+function hasImageContent(messages: Array<{ content: string | ContentPart[] }>): boolean {
+  return messages.some(m => Array.isArray(m.content) && m.content.some(p => p.type === 'image'));
+}
+
+/** Convert internal ContentPart[] to OpenAI-compatible format */
+function serializeContent(content: string | ContentPart[]): string | Array<Record<string, unknown>> {
+  if (typeof content === 'string') return content;
+  return content.map(p => {
+    if (p.type === 'text') return { type: 'text', text: p.text };
+    return { type: 'image_url', image_url: { url: p.image } };
+  });
+}
+
+// ── Raw OpenAI-compatible fetch (used for vision & stream) ────────
+
+async function callOpenAIRaw(
+  label: AILabel,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string | ContentPart[] }>,
+  opts: { maxTokens?: number; temperature?: number; timeout?: number; stream?: boolean },
+): Promise<AICallResult> {
+  const start = performance.now();
+  const apiKey = label.apiKeys[0]!;
+  const baseUrl = label.endpoint.replace(/\/+$/, '');
+  // Append /chat/completions; add /v1 only if endpoint doesn't already end with a version path
+  const chatUrl = /\/v\d+$/.test(baseUrl) ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
+
+  const body: Record<string, unknown> = {
+    model: label.model,
+    messages: messages.map(m => ({ role: m.role, content: serializeContent(m.content) })),
+  };
+  if (opts.maxTokens != null) body['max_tokens'] = opts.maxTokens;
+  if (opts.temperature != null) body['temperature'] = opts.temperature;
+  if (opts.stream) body['stream'] = true;
+
+  const res = await fetch(chatUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+    signal: opts.timeout ? AbortSignal.timeout(opts.timeout) : undefined,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    if (res.status === 429) throw new AIError(`Rate limited: ${errText}`, label.name, label.model, 'AI_RATE_LIMIT');
+    throw new AIError(`HTTP ${res.status}: ${errText}`, label.name, label.model);
+  }
+
+  let fullText = '';
+
+  if (opts.stream) {
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+          fullText += chunk.choices?.[0]?.delta?.content ?? '';
+        } catch { /* ignore */ }
+      }
+    }
+    buf += decoder.decode();
+    if (buf.trim().startsWith('data:')) {
+      const data = buf.trim().slice(5).trim();
+      if (data !== '[DONE]') {
+        try {
+          const chunk = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+          fullText += chunk.choices?.[0]?.delta?.content ?? '';
+        } catch { /* ignore */ }
+      }
+    }
+  } else {
+    const json = await res.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
+    fullText = json.choices?.[0]?.message?.content ?? '';
+    const latencyMs = Math.round(performance.now() - start);
+    const text = fullText
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .trim();
+    return {
+      content: text,
+      tokenUsage: {
+        prompt: json.usage?.prompt_tokens ?? 0,
+        completion: json.usage?.completion_tokens ?? 0,
+        total: json.usage?.total_tokens ?? 0,
+      },
+      model: label.model,
+      label: label.name,
+      latencyMs,
+    };
+  }
+
+  const latencyMs = Math.round(performance.now() - start);
+  const text = fullText
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .trim();
+  return {
+    content: text,
+    tokenUsage: { prompt: 0, completion: 0, total: 0 },
+    model: label.model,
+    label: label.name,
+    latencyMs,
+  };
+}
+
 // ── Main entry ────────────────────────────────────────────────────
 
 export async function callModel(
@@ -126,6 +247,15 @@ export async function callModel(
     throw new AIError('No API key configured', label.name, label.model, 'AI_NO_KEY');
   }
 
+  // Use raw fetch for vision (image content) or stream-only endpoints
+  // to ensure correct OpenAI-compatible image_url serialization
+  if (hasImageContent(messages) || label.stream) {
+    return callOpenAIRaw(label, messages, {
+      ...opts,
+      stream: label.stream,
+    });
+  }
+
   const provider = createOpenAI({
     baseURL: label.endpoint,
     apiKey,
@@ -133,93 +263,6 @@ export async function callModel(
   });
 
   try {
-    if (label.stream) {
-      // Stream-only endpoint: raw fetch + manual SSE parsing (most reliable)
-      const timeoutMs = opts.timeout ?? 60_000;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-      let fullText = '';
-      try {
-        const res = await fetch(`${label.endpoint}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: label.model,
-            messages: messages.map(m => ({
-              role: m.role,
-              content: typeof m.content === 'string' ? m.content : (m.content as ContentPart[]).map(p => p.type === 'text' ? p.text : '').join(''),
-            })),
-            max_tokens: opts.maxTokens,
-            temperature: opts.temperature,
-            stream: true,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '');
-          if (res.status === 429) throw new AIError(`Rate limited: ${errText}`, label.name, label.model, 'AI_RATE_LIMIT');
-          throw new AIError(`HTTP ${res.status}: ${errText}`, label.name, label.model);
-        }
-
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split('\n');
-          buf = lines.pop() ?? '';
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data:')) continue;
-            const data = trimmed.slice(5).trim();
-            if (data === '[DONE]') break;
-            try {
-              const chunk = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
-              fullText += chunk.choices?.[0]?.delta?.content ?? '';
-            } catch { /* ignore malformed chunks */ }
-          }
-        }
-        // Flush decoder internal state and process any residual buffer
-        buf += decoder.decode();
-        if (buf.trim()) {
-          const trimmed = buf.trim();
-          if (trimmed.startsWith('data:')) {
-            const data = trimmed.slice(5).trim();
-            if (data !== '[DONE]') {
-              try {
-                const chunk = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
-                fullText += chunk.choices?.[0]?.delta?.content ?? '';
-              } catch { /* ignore */ }
-            }
-          }
-        }
-      } finally {
-        clearTimeout(timer);
-      }
-
-      const latencyMs = Math.round(performance.now() - start);
-      const text = fullText
-        .replace(/<think>[\s\S]*?<\/think>/gi, '')
-        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-        .trim();
-
-      return {
-        content: text,
-        tokenUsage: { prompt: 0, completion: 0, total: 0 },
-        model: label.model,
-        label: label.name,
-        latencyMs,
-      };
-    }
-
     const result = await generateText({
       model: provider(label.model),
       messages: messages as Parameters<typeof generateText>[0]['messages'],

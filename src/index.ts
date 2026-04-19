@@ -13,6 +13,7 @@ import { closeQueue } from './queue/producer.js';
 import { freeEncoder } from './ai/token-counter.js';
 import { createAllowlistMiddleware } from './bot/middleware/allowlist.js';
 import { registerMemberHandler } from './bot/handlers/member.js';
+import { registerMessageHandler } from './bot/handlers/message.js';
 import { createAdminApi } from './admin/api.js';
 import { startCronJobs, stopCronJobs } from './cron/scheduler.js';
 import { initBotTracker } from './tracking/interaction.js';
@@ -71,6 +72,9 @@ async function main(): Promise<void> {
 
   // 7. Register member handler
   registerMemberHandler(bot, allowlistConfig);
+
+  // 7.5 Register message handler (AFTER allowlist middleware so it takes effect)
+  registerMessageHandler(bot);
 
   const ownership = getStartupOwnership();
 

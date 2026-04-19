@@ -47,6 +47,21 @@ async function handleBootstrap(
   const pending = await allowlist.listPending(deps.redis, deps.config);
   const groups = await allowlist.listGroups(deps.redis, deps.config);
   const manualQueue = await allowlist.listManualQueue(deps.redis, deps.config);
+
+  // Hydrate chat titles (bootstrap)
+  for (const item of [...pending, ...groups] as Array<Record<string, unknown>>) {
+    const cid = item.chat_id as number;
+    if (!cid) continue;
+    const idsToTry = cid > 0 ? [Number(`-100${cid}`), cid] : [cid];
+    for (const tryId of idsToTry) {
+      try {
+        const chat = await deps.bot.api.getChat(tryId);
+        if ('title' in chat && chat.title) { item.title = chat.title; item.chat_title = chat.title; }
+        if ('username' in chat && chat.username) { item.chat_username = `@${chat.username}`; }
+        break;
+      } catch { /* best-effort */ }
+    }
+  }
   const override = await runtimeConfig.loadOverride(deps.redis);
 
   const modelRouting = runtimeConfig.buildModelRoutingAdminView();
@@ -95,6 +110,9 @@ async function handleSubmit(
       .runAiReview(deps.redis, deps.config, result.request_id, {
         aiCall: deps.aiCall,
         getRecentContext: deps.getRecentContext,
+        getChat: async (chatId: number) => {
+          try { return await deps.bot.api.getChat(chatId) as unknown as Record<string, unknown>; } catch { return null; }
+        },
       })
       .catch((err: unknown) => logger.warn({ err, chatId }, 'Auto AI review failed'));
   }
@@ -194,6 +212,9 @@ async function handleAiReview(
   const result = await aiReview.runAiReview(deps.redis, deps.config, requestId, {
     aiCall: deps.aiCall,
     getRecentContext: deps.getRecentContext,
+    getChat: async (chatId: number) => {
+      try { return await deps.bot.api.getChat(chatId) as unknown as Record<string, unknown>; } catch { return null; }
+    },
   });
   return result;
 }

@@ -126,6 +126,32 @@ async function describeDocument(
     return `[Word文档${fileName ? `「${fileName}」` : ''}：无法读取内容]`;
   }
 
+  // XLSX — extract text from shared strings XML inside the ZIP
+  if (
+    effectiveMime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    fileName?.endsWith('.xlsx')
+  ) {
+    try {
+      const text = extractXlsxText(downloaded.buffer);
+      if (text && text.length > 10) {
+        const truncated = text.slice(0, 2000);
+        const result = await callWithFallback({
+          usage: 'summarize',
+          messages: [
+            { role: 'system', content: '用中文简要概括以下Excel表格内容（3-5句话）。' },
+            { role: 'user', content: truncated },
+          ],
+          maxTokens: 200,
+          temperature: 0.3,
+        });
+        return `[Excel文件${fileName ? `「${fileName}」` : ''}内容：${result.content.trim()}]`;
+      }
+    } catch (err) {
+      logger.warn({ fileId, err }, 'XLSX extraction failed');
+    }
+    return `[Excel文件${fileName ? `「${fileName}」` : ''}：无法读取内容]`;
+  }
+
   // Plain text
   if (effectiveMime.startsWith('text/')) {
     try {
@@ -173,6 +199,33 @@ function extractDocxText(buffer: ArrayBuffer): string {
   }
 }
 
+function extractXlsxText(buffer: ArrayBuffer): string {
+  try {
+    const bytes = Buffer.from(buffer);
+    const str = bytes.toString('binary');
+    // Find xl/sharedStrings.xml in the ZIP
+    const marker = 'xl/sharedStrings.xml';
+    const idx = str.indexOf(marker);
+    if (idx < 0) return '';
+    const xmlStart = str.indexOf('<?xml', idx);
+    if (xmlStart < 0) return '';
+    const xmlEnd = str.indexOf('</sst>', xmlStart);
+    if (xmlEnd < 0) return '';
+    const xml = str.slice(xmlStart, xmlEnd + 6);
+    // Extract <t> text nodes
+    const texts: string[] = [];
+    const re = /<t[^>]*>([^<]+)<\/t>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) !== null) {
+      texts.push(m[1]!);
+    }
+    return texts.join(' | ').slice(0, 3000).trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
 /**
  * Describe any multimodal content in a message (audio, voice, document, video).
  * Returns a descriptive string to inject into context, or null if none.

@@ -15,8 +15,6 @@ export async function createBot(): Promise<Bot> {
     _botUid = _bot.botInfo.id;
     logger.info({ botUid: _botUid, username: _bot.botInfo.username }, 'Bot identity fetched');
 
-    registerMessageHandler(_bot);
-
     _bot.catch((err) => {
       logger.error({ err: err.error }, 'Bot error');
     });

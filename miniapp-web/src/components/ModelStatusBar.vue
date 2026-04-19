@@ -159,22 +159,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="data || error" class="ms-container">
-    <div class="ms-header">
-      <span class="ms-title">模型状态</span>
-      <div class="ms-legend">
-        <span class="ms-legend-item"><span class="ms-dot" style="background: var(--ms-blue, #3b82f6)"></span>可用</span>
-        <span class="ms-legend-item"><span class="ms-dot" style="background: var(--ms-green, #22c55e)"></span>缓慢</span>
-        <span class="ms-legend-item"><span class="ms-dot" style="background: var(--ms-red, #ef4444)"></span>不可用</span>
-      </div>
+  <div v-if="data || error">
+    <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>模型状态</span>
+      <span class="ms-legend">
+        <span class="ms-legend-item"><span class="ms-dot" style="background:#3b82f6"></span>可用</span>
+        <span class="ms-legend-item"><span class="ms-dot" style="background:#22c55e"></span>缓慢</span>
+        <span class="ms-legend-item"><span class="ms-dot" style="background:#ef4444"></span>不可用</span>
+      </span>
     </div>
 
-    <div v-if="error && !data" class="ms-error">无法加载状态数据</div>
+    <div v-if="error && !data" class="card">
+      <span class="text-error">无法加载状态数据</span>
+    </div>
 
-    <div v-for="group in groupedModelList" :key="group.model" class="ms-model">
+    <div v-for="group in groupedModelList" :key="group.model" class="card">
       <div class="ms-model-header">
         <span class="ms-model-name">{{ group.model }}</span>
-        <span class="ms-model-members">{{ group.members.length }} 路由</span>
+        <span class="text-hint" style="font-size:12px">{{ group.members.length }} 路由</span>
         <span class="ms-model-status" :style="{ color: statusColor(group.status) }">
           {{ statusText(group.status) }}
           <template v-if="group.latestLatency > 0"> · {{ formatLatency(group.latestLatency) }}</template>
@@ -183,14 +185,8 @@ onUnmounted(() => {
           {{ expandedModels[group.model] ? '收起' : '展开' }}
         </button>
       </div>
-      <div class="ms-bars" :title="`最近 ${MAX_BARS} 分钟`">
-        <div
-          v-for="(bar, i) in group.members[0].bars"
-          :key="i"
-          class="ms-bar"
-          :style="{ background: statusColor(bar.status) }"
-          :title="bar.ts ? `${formatTime(bar.ts)} — ${statusText(bar.status)}${bar.latency ? ' ' + formatLatency(bar.latency) : ''}` : ''"
-        />
+      <div class="ms-bars">
+        <div v-for="(bar, i) in group.members[0].bars" :key="i" class="ms-bar" :style="{ background: statusColor(bar.status) }" :title="bar.ts ? `${formatTime(bar.ts)} — ${statusText(bar.status)}${bar.latency ? ' ' + formatLatency(bar.latency) : ''}` : ''" />
       </div>
       <div class="ms-time-axis">
         <span>{{ group.members[0].bars[0]?.ts ? formatTime(group.members[0].bars[0].ts) : '' }}</span>
@@ -199,10 +195,8 @@ onUnmounted(() => {
       <div v-if="group.members.length > 1 && expandedModels[group.model]" class="ms-member-list">
         <div v-for="m in group.members" :key="m.label" class="ms-member-row">
           <span class="ms-member-label">{{ m.label }}</span>
-          <span class="ms-model-badge" :class="`ms-role-${m.role}`">{{ roleLabel[m.role] || m.role }}</span>
-          <span class="ms-member-status" :style="{ color: statusColor(m.latest?.status) }">
-            {{ statusText(m.latest?.status) }}
-          </span>
+          <span :class="['badge', m.role === 'main' ? 'badge-accent' : m.role === 'review' ? 'badge-warn' : 'badge-muted']" style="font-size:11px">{{ roleLabel[m.role] || m.role }}</span>
+          <span class="ms-model-status" :style="{ color: statusColor(m.latest?.status) }">{{ statusText(m.latest?.status) }}</span>
         </div>
       </div>
     </div>
@@ -210,181 +204,30 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.ms-container {
-  --ms-blue: #3b82f6;
-  --ms-green: #22c55e;
-  --ms-red: #ef4444;
-  --ms-empty: rgba(128, 128, 128, 0.15);
-  margin: 0 0 8px;
-  padding: 14px 16px 10px;
-  background: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
-  border-top: 0.5px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
-  border-bottom: 0.5px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
-}
+.ms-legend { display: flex; gap: 8px; }
+.ms-legend-item { display: flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); }
+.ms-dot { width: 7px; height: 7px; border-radius: 50%; }
 
-.ms-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.ms-title {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--tg-theme-section-header-text-color, var(--tg-theme-hint-color, #8e8e93));
-  letter-spacing: 0.02em;
-}
-
-.ms-legend {
-  display: flex;
-  gap: 10px;
-}
-
-.ms-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.ms-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.ms-error {
-  font-size: 13px;
-  color: var(--tg-theme-destructive-text-color, #ff3b30);
-  padding: 8px 0;
-}
-
-.ms-model {
-  margin-bottom: 10px;
-}
-
-.ms-model:last-child {
-  margin-bottom: 0;
-}
-
-.ms-model-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-}
-
-.ms-model-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color, #000);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.ms-model-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.ms-role-main {
-  background: color-mix(in srgb, var(--ms-blue) 15%, transparent);
-  color: var(--ms-blue);
-}
-
-.ms-role-backup {
-  background: color-mix(in srgb, var(--tg-theme-hint-color, #8e8e93) 15%, transparent);
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.ms-role-review {
-  background: color-mix(in srgb, #f59e0b 18%, transparent);
-  color: #b45309;
-}
-
-.ms-model-status {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.ms-model-members {
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
+.ms-model-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.ms-model-name { font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-model-status { margin-left: auto; font-size: 12px; font-weight: 500; flex-shrink: 0; }
 
 .ms-expand-btn {
-  margin-left: 6px;
   border: none;
   background: transparent;
-  color: var(--tg-theme-link-color, #007aff);
+  color: var(--accent);
   font-size: 12px;
   cursor: pointer;
+  margin-left: 4px;
 }
 
-.ms-bars {
-  display: flex;
-  gap: 1.5px;
-  height: 26px;
-  align-items: stretch;
-}
+.ms-bars { display: flex; gap: 1.5px; height: 24px; align-items: stretch; }
+.ms-bar { flex: 1; min-width: 0; border-radius: 2px; transition: opacity 0.15s; }
+.ms-bar:hover { opacity: 0.7; }
 
-.ms-bar {
-  flex: 1;
-  min-width: 0;
-  border-radius: 2px;
-  transition: opacity 0.15s;
-  cursor: default;
-}
+.ms-time-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; opacity: 0.7; }
 
-.ms-bar:hover {
-  opacity: 0.7;
-}
-
-.ms-time-axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: var(--tg-theme-hint-color, #8e8e93);
-  margin-top: 3px;
-  opacity: 0.7;
-}
-
-.ms-member-list {
-  margin-top: 6px;
-  border-top: 0.5px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
-  padding-top: 6px;
-}
-
-.ms-member-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  padding: 4px 0;
-}
-
-.ms-member-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--tg-theme-hint-color, #8e8e93);
-}
-
-.ms-member-status {
-  font-weight: 600;
-}
+.ms-member-list { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.ms-member-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
+.ms-member-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 </style>

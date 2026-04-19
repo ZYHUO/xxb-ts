@@ -16,6 +16,22 @@ vi.mock('../../../src/shared/config.js', () => ({
 
 vi.mock('../../../src/pipeline/tools/registry.js', () => ({
   buildToolSet: (...args: unknown[]) => mockBuildToolSet(...args),
+  getToolNames: vi.fn(() => []),
+  preloadSkills: vi.fn(),
+  executeValidatedToolStep: async (
+    toolName: string,
+    rawArgs: unknown,
+    chatId: number,
+    userId: number,
+  ) => {
+    const tools = mockBuildToolSet(chatId, userId) as Record<
+      string,
+      { execute?: (a: unknown, b: unknown) => Promise<unknown> }
+    >;
+    const t = tools[toolName];
+    if (!t?.execute) throw new Error(`no tool ${toolName}`);
+    return t.execute(rawArgs, { toolCallId: 'planner', messages: [] });
+  },
 }));
 
 import { parsePlannerResponse, planReply } from '../../../src/pipeline/planner/planner.js';
@@ -39,7 +55,9 @@ describe('planner', () => {
     });
     mockBuildToolSet.mockReturnValue({
       SEARCH: {
-        execute: vi.fn(async ({ query }: { query: string }) => ({ query, result: 'ok' })),
+        execute: vi.fn(
+          async ({ query }: { query: string }, _opts: unknown) => ({ query, result: 'ok' }),
+        ),
       },
     });
   });

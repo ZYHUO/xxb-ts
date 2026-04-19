@@ -125,20 +125,26 @@ function parseDdgLiteHtml(html: string): SearchResult[] {
   let m: RegExpExecArray | null;
 
   while ((m = linkPattern.exec(html)) !== null) {
+    const href = m[1];
+    const titleRaw = m[2];
+    if (href === undefined || titleRaw === undefined) continue;
     links.push({
-      url: m[1],
-      title: stripTags(m[2]).trim(),
+      url: href,
+      title: stripTags(titleRaw).trim(),
     });
   }
 
   const snippets: string[] = [];
   while ((m = snippetPattern.exec(html)) !== null) {
-    snippets.push(stripTags(m[1]).trim());
+    const sn = m[1];
+    snippets.push(sn === undefined ? '' : stripTags(sn).trim());
   }
 
   for (let i = 0; i < links.length; i++) {
-    const { url, title } = links[i];
-    const snippet = i < snippets.length ? snippets[i] : '';
+    const link = links[i];
+    if (!link) continue;
+    const { url, title } = link;
+    const snippet = (i < snippets.length ? snippets[i] : '') ?? '';
     if (title && url) {
       results.push({ title, url, snippet });
     }
