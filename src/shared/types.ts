@@ -82,10 +82,21 @@ export interface RetrievedContext {
   tokenCount: number;
 }
 
+// Structural shape of a Telegram Update, wide enough to accept both grammy's
+// strongly-typed Update and ad-hoc test fixtures while keeping field names
+// statically known at the formatter boundary.
+export interface UpdateLike {
+  update_id?: unknown;
+  message?: unknown;
+  edited_message?: unknown;
+  channel_post?: unknown;
+  edited_channel_post?: unknown;
+}
+
 export interface ChatJob {
   type: 'message' | 'allowlist_review';
   chatId: number;
   messageId?: number;
-  update: Record<string, unknown>;
+  update: UpdateLike;
   enqueuedAt: number;
 }

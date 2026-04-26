@@ -5,7 +5,7 @@ import type { Bot } from 'grammy';
 import { logger } from '../shared/logger.js';
 import { validateInitData, isMaster } from './auth.js';
 import type { TelegramUser } from './auth.js';
-import type { AllowlistConfig } from '../allowlist/types.js';
+import type { AllowlistConfig, GroupRecord, PendingRequest } from '../allowlist/types.js';
 import * as allowlist from '../allowlist/allowlist.js';
 import * as aiReview from '../allowlist/ai-review.js';
 import * as notify from '../allowlist/notify.js';
@@ -48,9 +48,16 @@ async function handleBootstrap(
   const groups = await allowlist.listGroups(deps.redis, deps.config);
   const manualQueue = await allowlist.listManualQueue(deps.redis, deps.config);
 
-  // Hydrate chat titles (bootstrap)
-  for (const item of [...pending, ...groups] as Array<Record<string, unknown>>) {
-    const cid = item.chat_id as number;
+  // Hydrate chat titles (bootstrap). Both record types share `chat_id`; the
+  // mutated extras (`title` / `chat_title` / `chat_username`) are tracked on
+  // the intersection so the loop is type-safe in place.
+  type Hydratable = (PendingRequest | GroupRecord) & {
+    title?: string;
+    chat_title?: string;
+    chat_username?: string;
+  };
+  for (const item of [...pending, ...groups] as Hydratable[]) {
+    const cid = item.chat_id;
     if (!cid) continue;
     const idsToTry = cid > 0 ? [Number(`-100${cid}`), cid] : [cid];
     for (const tryId of idsToTry) {
@@ -111,7 +118,7 @@ async function handleSubmit(
         aiCall: deps.aiCall,
         getRecentContext: deps.getRecentContext,
         getChat: async (chatId: number) => {
-          try { return await deps.bot.api.getChat(chatId) as unknown as Record<string, unknown>; } catch { return null; }
+          try { return await deps.bot.api.getChat(chatId); } catch { return null; }
         },
       })
       .catch((err: unknown) => logger.warn({ err, chatId }, 'Auto AI review failed'));

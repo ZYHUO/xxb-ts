@@ -2,7 +2,7 @@
 // Telegram Update → FormattedMessage 转换
 // ────────────────────────────────────────
 
-import type { FormattedMessage } from '../shared/types.js';
+import type { FormattedMessage, UpdateLike } from '../shared/types.js';
 
 interface TgUser {
   id: number;
@@ -126,14 +126,16 @@ function getLargestPhoto(photos: TgPhotoSize[]): string | undefined {
   return sorted[0]?.file_id;
 }
 
-export function formatMessage(update: Record<string, unknown>): FormattedMessage | null {
-  const msg = (
-    update['message'] ??
-    update['edited_message'] ??
-    update['channel_post'] ??
-    update['edited_channel_post']
-  ) as TgMessage | undefined;
-  if (!msg) return null;
+export function formatMessage(update: UpdateLike): FormattedMessage | null {
+  const candidate =
+    update.message ??
+    update.edited_message ??
+    update.channel_post ??
+    update.edited_channel_post;
+  if (!candidate || typeof candidate !== 'object') return null;
+  // Single boundary cast: Telegram JSON -> typed shape. Field shape is
+  // guaranteed by the Telegram API contract.
+  const msg = candidate as TgMessage;
 
   const from = msg.from;
   const senderChat = msg.sender_chat;

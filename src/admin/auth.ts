@@ -1,14 +1,17 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { z } from 'zod';
 import { logger } from '../shared/logger.js';
 import { env } from '../env.js';
 
-export interface TelegramUser {
-  id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}
+const telegramUserSchema = z.object({
+  id: z.number().int().positive(),
+  first_name: z.string(),
+  last_name: z.string().optional(),
+  username: z.string().optional(),
+  language_code: z.string().optional(),
+});
+
+export type TelegramUser = z.infer<typeof telegramUserSchema>;
 
 /**
  * Validate Telegram WebApp initData using HMAC-SHA256.
@@ -40,10 +43,15 @@ export function validateInitData(initData: string, botToken: string): TelegramUs
     const age = Math.floor(Date.now() / 1000) - authTs;
     if (age > 86400) return null;
 
-    // Parse user
+    // Parse and validate user
     const userJson = params.get('user');
     if (!userJson) return null;
-    return JSON.parse(userJson) as TelegramUser;
+    const parsed = telegramUserSchema.safeParse(JSON.parse(userJson));
+    if (!parsed.success) {
+      logger.warn({ issues: parsed.error.issues }, 'validateInitData: user payload schema invalid');
+      return null;
+    }
+    return parsed.data;
   } catch (err) {
     logger.warn({ err }, 'validateInitData failed');
     return null;

@@ -51,6 +51,29 @@ function getYesterdayDate(): string {
   return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
 }
 
+// Single round-trip to fetch both the user's rank for today and the total
+// number of checkins today. Used by the "already checked in" and concurrent-
+// insert branches; replaces two separate prepared queries.
+function getRankAndTodayTotal(
+  db: ReturnType<typeof getDb>,
+  chatId: number,
+  uid: number,
+  today: string,
+): { rank: number; total: number } {
+  const row = db.prepare(`
+    SELECT
+      SUM(CASE WHEN id <= (
+        SELECT id FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?
+      ) THEN 1 ELSE 0 END) AS rank,
+      COUNT(*) AS total
+    FROM checkins
+    WHERE chat_id = ? AND checkin_date = ?
+  `).get(chatId, uid, today, chatId, today) as
+    | { rank: number | null; total: number }
+    | undefined;
+  return { rank: row?.rank ?? 0, total: row?.total ?? 0 };
+}
+
 export function doCheckin(
   chatId: number,
   uid: number,
@@ -76,13 +99,7 @@ export function doCheckin(
 
   if (existing) {
     // Already checked in, return existing data
-    const rank = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ? AND id <= (SELECT id FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?)',
-    ).get(chatId, today, chatId, uid, today) as { cnt: number }).cnt;
-
-    const todayTotal = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ?',
-    ).get(chatId, today) as { cnt: number }).cnt;
+    const { rank, total: todayTotal } = getRankAndTodayTotal(db, chatId, uid, today);
 
     return {
       isNew: false,
@@ -131,12 +148,7 @@ export function doCheckin(
       streak: number; total_checkins: number; reward_coins: number;
       reward_exp: number; lucky_number: number; fortune: string;
     };
-    const rank2 = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ? AND id <= (SELECT id FROM checkins WHERE chat_id = ? AND uid = ? AND checkin_date = ?)',
-    ).get(chatId, today, chatId, uid, today) as { cnt: number }).cnt;
-    const todayTotal2 = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM checkins WHERE chat_id = ? AND checkin_date = ?',
-    ).get(chatId, today) as { cnt: number }).cnt;
+    const { rank: rank2, total: todayTotal2 } = getRankAndTodayTotal(db, chatId, uid, today);
     return {
       isNew: false,
       streak: existing2.streak,

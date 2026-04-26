@@ -93,6 +93,17 @@ export function isStarted(): boolean {
 
 const _running = new Set<string>();
 
+const CRON_TIMEOUT_MS: Record<string, number> = {
+  'model-check': 60_000,
+  'daily-report': 5 * 60_000,
+  'cleanup': 5 * 60_000,
+  'knowledge-sync': 15 * 60_000,
+  'user-profile-sync': 10 * 60_000,
+  'idle-check': 60_000,
+  'channel-sync': 10 * 60_000,
+};
+const DEFAULT_CRON_TIMEOUT_MS = 5 * 60_000;
+
 async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
   if (_running.has(name)) {
     logger.warn({ name }, 'Cron job already running, skipping');
@@ -100,14 +111,23 @@ async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
   }
   _running.add(name);
   const start = performance.now();
+  const timeoutMs = CRON_TIMEOUT_MS[name] ?? DEFAULT_CRON_TIMEOUT_MS;
+  let timer: NodeJS.Timeout | undefined;
   try {
-    await fn();
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Cron job ${name} timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+    await Promise.race([fn(), timeout]);
     const durationMs = Math.round(performance.now() - start);
     logger.debug({ name, durationMs }, 'Cron job completed');
   } catch (err) {
     const durationMs = Math.round(performance.now() - start);
-    logger.error({ err, name, durationMs }, 'Cron job failed');
+    logger.error({ err, name, durationMs, timeoutMs }, 'Cron job failed');
   } finally {
+    if (timer) clearTimeout(timer);
     _running.delete(name);
   }
 }
