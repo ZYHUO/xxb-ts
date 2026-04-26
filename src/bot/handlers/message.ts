@@ -27,11 +27,13 @@ async function handleUpdate(ctx: Context): Promise<void> {
     logger.warn({ err, userId }, 'Rate limit check failed, proceeding');
   }
 
-  const senderChat = (msg as unknown as { sender_chat?: { title?: string; username?: string } }).sender_chat;
+  const senderChat = msg.sender_chat;
+  const senderChatUsername = senderChat && 'username' in senderChat ? senderChat.username : undefined;
+  const senderChatTitle = senderChat && 'title' in senderChat ? senderChat.title : undefined;
   const isAnonymousAdmin = msg.from?.id === 1087968824;
   const displayName = (isAnonymousAdmin || !msg.from)
-    ? (senderChat?.title ?? senderChat?.username ?? 'channel')
-    : (msg.from?.username ?? msg.from?.first_name ?? 'unknown');
+    ? (senderChatTitle ?? senderChatUsername ?? 'channel')
+    : (msg.from.username ?? msg.from.first_name ?? 'unknown');
 
   logger.info(
     {
@@ -49,7 +51,7 @@ async function handleUpdate(ctx: Context): Promise<void> {
     chatId,
     messageId,
     isEdit,
-    update: ctx.update as unknown as Record<string, unknown>,
+    update: ctx.update,
     enqueuedAt: Date.now(),
   });
 }

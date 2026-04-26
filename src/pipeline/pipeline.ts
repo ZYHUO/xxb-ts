@@ -2,7 +2,13 @@
 // Pipeline Orchestrator — full message pipeline
 // ────────────────────────────────────────
 
-import type { ChatJob } from "../shared/types.js";
+import type {
+  ChatJob,
+  FormattedMessage,
+  JudgeResult,
+  ReplyPath,
+  ReplyTier,
+} from "../shared/types.js";
 import { resolveReplyPath, resolveReplyTier } from "../shared/types.js";
 import { formatMessage } from "./formatter.js";
 import { addMessage, getRecent, addAssistant } from "./context/manager.js";
@@ -132,16 +138,629 @@ async function shouldSuppressStaleReply(
     .some((entry) => isAssistantTurn(entry, botUid));
 }
 
+// Vision / sticker / multimodal processing — runs media branches in parallel
+// and mutates `formatted` with descriptions. ReplyTo attachment handling is
+// included so the orchestrator only sees a single media stage.
+async function processMedia(formatted: FormattedMessage): Promise<void> {
+  const hasMedia = !!(
+    formatted.imageFileId ||
+    formatted.sticker ||
+    formatted.audioFileId ||
+    formatted.voiceFileId ||
+    formatted.documentFileId ||
+    formatted.videoFileId ||
+    formatted.videoNoteFileId
+  );
+  if (hasMedia) {
+    await Promise.all([
+      formatted.imageFileId
+        ? describeImage(formatted.imageFileId)
+            .then((d) => { if (d) formatted.imageDescriptions = [d]; })
+            .catch((err) => logger.warn({ err }, "Vision failed, continuing"))
+        : Promise.resolve(),
+      formatted.sticker
+        ? describeStickerCached(formatted.sticker.fileId, formatted.sticker.fileUniqueId)
+            .then((d) => { if (d && d !== "[图片]") (formatted.sticker as { description?: string }).description = d; })
+            .catch((err) => logger.warn({ err }, "Sticker description failed, continuing"))
+        : Promise.resolve(),
+      (formatted.audioFileId || formatted.voiceFileId || formatted.documentFileId || formatted.videoFileId || formatted.videoNoteFileId)
+        ? describeMultimodal(formatted)
+            .then((d) => { if (d) formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + d : d).trim(); })
+            .catch((err) => logger.warn({ err }, "Multimodal processing failed, continuing"))
+        : Promise.resolve(),
+    ]);
+  }
+
+  // ReplyTo attachment — if user replies to a message with a file/image, process it
+  if (formatted.replyTo && !formatted.documentFileId && !formatted.imageFileId) {
+    if (formatted.replyTo.documentFileId) {
+      formatted.documentFileId = formatted.replyTo.documentFileId;
+      formatted.documentMimeType = formatted.replyTo.documentMimeType;
+      formatted.documentFileName = formatted.replyTo.documentFileName;
+      try {
+        const desc = await describeMultimodal(formatted);
+        if (desc) {
+          formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + desc : desc).trim();
+        }
+      } catch (err) {
+        logger.warn({ err }, "ReplyTo document processing failed, continuing");
+      }
+      formatted.documentFileId = undefined;
+    } else if (formatted.replyTo.imageFileId) {
+      try {
+        const description = await describeImage(formatted.replyTo.imageFileId);
+        if (description) {
+          formatted.imageDescriptions = [description];
+        }
+      } catch (err) {
+        logger.warn({ err }, "ReplyTo image processing failed, continuing");
+      }
+    }
+  }
+}
+
+// Mute / unmute command interceptors — group only. Returns true when a command
+// was handled (caller should early-return) and false when the message should
+// continue down the pipeline.
+async function tryMuteCommandIntercepts(
+  chatId: number,
+  formatted: FormattedMessage,
+  judgeResult: JudgeResult,
+): Promise<boolean> {
+  if (formatted.isAnonymous) {
+    if (
+      judgeResult.rule === "self_mute_request" ||
+      judgeResult.rule === "self_unmute_request"
+    ) {
+      await sender.sendDirect(
+        chatId,
+        "频道身份没法用这个命令喵，用个人身份试试~",
+        formatted.messageId,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  if (chatId >= 0) return false; // group-only
+
+  const rule = judgeResult.rule;
+
+  if (rule === "mute_hard_request") {
+    muteUser(chatId, formatted.uid, 2);
+    await sender.sendDirect(chatId, "好的，本喵完全闭嘴喵~", formatted.messageId);
+    logger.info({ chatId, uid: formatted.uid, level: 2 }, "User hard-muted bot");
+    return true;
+  }
+
+  if (rule === "mute_soft_request") {
+    muteUser(chatId, formatted.uid, 1, { temporary: true });
+    await sender.sendDirect(chatId, "好的，本喵不会主动找你说话了喵~", formatted.messageId);
+    logger.info({ chatId, uid: formatted.uid, level: 1 }, "User soft-muted bot");
+    return true;
+  }
+
+  if (rule === "mute_timed_request") {
+    const text = formatted.textContent || formatted.captionContent || "";
+    const durationMs = parseMuteTimedRequest(text);
+    if (durationMs && durationMs > 0) {
+      muteUser(chatId, formatted.uid, 1, { temporary: true, durationMs });
+      const minutes = Math.round(durationMs / 60_000);
+      await sender.sendDirect(chatId, `好的，本喵安静 ${minutes} 分钟喵~`, formatted.messageId);
+      logger.info({ chatId, uid: formatted.uid, durationMs }, "User timed-muted bot");
+      return true;
+    }
+    return false;
+  }
+
+  if (rule === "unmute_request") {
+    unmuteUser(chatId, formatted.uid);
+    await sender.sendDirect(chatId, "嗯！本喵又可以说话啦喵~", formatted.messageId);
+    logger.info({ chatId, uid: formatted.uid }, "User unmuted bot");
+    return true;
+  }
+
+  if (rule === "self_mute_request") {
+    muteUser(chatId, formatted.uid, 2);
+    await sender.sendDirect(
+      chatId,
+      "好的，以后本喵不回复你的消息了喵~（发 /unmuteme 取消）",
+      formatted.messageId,
+    );
+    logger.info({ chatId, uid: formatted.uid }, "User self-muted (level 2)");
+    return true;
+  }
+
+  if (rule === "self_unmute_request") {
+    unmuteUser(chatId, formatted.uid);
+    await sender.sendDirect(chatId, "好的，本喵又会回复你的消息了喵~", formatted.messageId);
+    logger.info({ chatId, uid: formatted.uid }, "User self-unmuted");
+    return true;
+  }
+
+  return false;
+}
+
+// Mutable holder for the per-chat lock that processPipeline acquires once,
+// releases before slow AI work, and re-acquires before sending. The holder
+// lets stage helpers update both fields in place without losing identity.
+interface ChatLockState {
+  release: () => Promise<void>;
+  held: boolean;
+}
+
+// Reply generation, send, and post-send bookkeeping. Wraps everything in a
+// try/catch with a fallback error message and reply_max placeholder cleanup.
+async function generateAndSendReplies(args: {
+  job: ChatJob;
+  formatted: FormattedMessage;
+  judgeResult: JudgeResult;
+  botUid: number;
+  effectiveReplyPath: ReplyPath;
+  effectiveReplyTier: ReplyTier;
+  e: ReturnType<typeof env>;
+  start: number;
+  timings: Record<string, number>;
+  lockState: ChatLockState;
+  releaseHeldChatLock: () => Promise<void>;
+}): Promise<void> {
+  const {
+    job,
+    formatted,
+    judgeResult,
+    botUid,
+    effectiveReplyPath,
+    effectiveReplyTier,
+    e,
+    start,
+    timings,
+    lockState,
+    releaseHeldChatLock,
+  } = args;
+
+  let maxPlaceholderMsgId: number | undefined;
+  try {
+    // 6. reply_max: quota check + thinking placeholder
+    if (effectiveReplyTier === "max") {
+      const remaining = getRemainingMaxQuota(formatted.uid);
+      if (remaining <= 0) {
+        await sender.sendDirect(
+          job.chatId,
+          "今天的深度思考次数已用完喵（每人每天3次）~",
+          formatted.messageId,
+        );
+        logger.info({ chatId: job.chatId, uid: formatted.uid }, "reply_max quota exhausted");
+        return;
+      }
+      maxPlaceholderMsgId = await sendMessage(job.chatId, "💭 思考中…");
+    }
+
+    // 6b. Send typing indicator
+    await sendChatAction(job.chatId, "typing");
+
+    // 7. 4-way context retrieval
+    const t4 = performance.now();
+    const retrievalMode = effectiveReplyPath === "planned" ? "planned" : "direct";
+    const retrievedContext = await retrieveContext(job.chatId, formatted, botUid, {
+      mode: retrievalMode,
+    });
+    timings["retrieval"] = Math.round(performance.now() - t4);
+
+    // 8. Generate reply (returns array for multi-reply support)
+    const t5 = performance.now();
+    const replyResult = await generateReply(
+      formatted,
+      retrievedContext,
+      judgeResult.action,
+      job.chatId,
+      botUid,
+      effectiveReplyPath,
+      effectiveReplyTier,
+    );
+    const replies = replyResult.replies;
+    timings["reply"] = Math.round(performance.now() - t5);
+
+    lockState.release = await acquireChatLock(job.chatId);
+    lockState.held = true;
+
+    if (
+      await shouldSuppressStaleReply(
+        job.chatId,
+        formatted,
+        judgeResult.rule,
+        botUid,
+        e.JUDGE_WINDOW_SIZE,
+      )
+    ) {
+      if (maxPlaceholderMsgId) {
+        await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
+      }
+      logger.info(
+        { chatId: job.chatId, messageId: formatted.messageId, rule: judgeResult.rule },
+        "Concurrent reply suppressed after newer assistant turn",
+      );
+      return;
+    }
+
+    // 9. Send all replies to Telegram
+    const t6 = performance.now();
+    const sentMessages: Array<{ messageId: number; text: string }> = [];
+
+    const override = await loadOverrideCached(getRedis()).catch(() => null);
+    const stickerPolicy = {
+      enabled: override?.sticker_policy?.enabled ?? true,
+      mode: override?.sticker_policy?.mode ?? "ai",
+      sendPosition: override?.sticker_policy?.send_position ?? "after",
+    };
+    const replyQuoteEnabled = override?.reply_quote !== false;
+
+    const allSameTarget =
+      replies.length > 1 &&
+      replies.every((r) => r.targetMessageId === replies[0]!.targetMessageId);
+
+    const sendResults = await Promise.allSettled(
+      replies.map(async (reply, replyIdx) => {
+        let stickerFileId: string | undefined;
+        let stickerFileUniqueId: string | undefined;
+        let stickerIntent: string | undefined;
+        if (
+          stickerPolicy.enabled &&
+          stickerPolicy.mode !== "off" &&
+          reply.stickerIntent &&
+          reply.stickerIntent.length > 0 &&
+          _repliesSinceLastSticker >= STICKER_COOLDOWN_REPLIES
+        ) {
+          const candidates = getReadyStickersByIntent(reply.stickerIntent);
+          if (candidates.length > 0) {
+            candidates.sort((a, b) => b.score - a.score);
+            const fresh = candidates.filter((c) => !_recentStickerIds.has(c.fileUniqueId));
+            const pool = (fresh.length > 0 ? fresh : candidates).slice(0, 10);
+            const picked = pool[Math.floor(Math.random() * pool.length)]!;
+            _trackRecentSticker(picked.fileUniqueId);
+            stickerFileId = picked.fileId;
+            stickerFileUniqueId = picked.fileUniqueId;
+            stickerIntent = reply.stickerIntent[0];
+          }
+        }
+
+        if (stickerFileId && stickerPolicy.sendPosition === "before") {
+          const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
+            logger.warn({ err, chatId: job.chatId }, "Sticker send (before) failed, continuing");
+            return undefined;
+          });
+          if (stickerMsgId && stickerFileUniqueId) {
+            recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
+          }
+        }
+
+        const replyToId =
+          !replyQuoteEnabled ||
+          reply.replyQuote === false ||
+          (allSameTarget && replyIdx > 0)
+            ? undefined
+            : reply.targetMessageId;
+
+        const isStickerOnly = reply.replyContent.trim() === '[sticker]' && stickerFileId;
+
+        if (!isStickerOnly) {
+          const sent = await sender.sendDirect(job.chatId, reply.replyContent, replyToId);
+
+          if (stickerFileId && stickerPolicy.sendPosition === "after") {
+            const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
+              logger.warn({ err, chatId: job.chatId }, "Sticker send (after) failed, continuing");
+              return undefined;
+            });
+            if (stickerMsgId && stickerFileUniqueId) {
+              recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
+            }
+          }
+
+          return { messageId: sent.messageId, text: reply.replyContent };
+        }
+
+        if (stickerFileId) {
+          const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
+            logger.warn({ err, chatId: job.chatId }, "Sticker-only send failed");
+            return undefined;
+          });
+          if (stickerMsgId && stickerFileUniqueId) {
+            recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
+          }
+          return { messageId: stickerMsgId ?? 0, text: '[sticker]' };
+        }
+        return { messageId: 0, text: '' };
+      }),
+    );
+
+    for (let replyIdx = 0; replyIdx < sendResults.length; replyIdx++) {
+      const result = sendResults[replyIdx]!;
+      if (result.status === "fulfilled") {
+        sentMessages.push(result.value);
+        _repliesSinceLastSticker++;
+      } else {
+        logger.error(
+          { chatId: job.chatId, targetMessageId: replies[replyIdx]!.targetMessageId, err: result.reason },
+          "Failed to send reply in multi-reply sequence",
+        );
+      }
+    }
+    timings["send"] = Math.round(performance.now() - t6);
+
+    if (sentMessages.length === 0) {
+      throw new Error("All replies failed to send");
+    }
+
+    // Edit reply_max placeholder to first reply (avoids delete+send flicker)
+    if (maxPlaceholderMsgId && sentMessages.length > 0) {
+      const first = sentMessages[0]!;
+      await editMessage(job.chatId, maxPlaceholderMsgId, first.text).catch((err) => {
+        logger.warn({ err, chatId: job.chatId }, "Failed to edit placeholder, leaving as-is");
+      });
+      sentMessages[0] = { messageId: maxPlaceholderMsgId, text: first.text };
+    } else if (maxPlaceholderMsgId) {
+      await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
+    }
+
+    if (effectiveReplyTier === "max") {
+      consumeMaxQuota(formatted.uid);
+      logger.info(
+        { chatId: job.chatId, uid: formatted.uid },
+        "reply_max quota consumed after success",
+      );
+    }
+
+    await reflectChatPathPolicy({
+      chatId: job.chatId,
+      message: formatted,
+      botUid,
+      effectiveReplyPath,
+      replyText: sentMessages[0]?.text ?? "",
+      toolsUsed: replyResult.toolsUsed,
+      toolExecutionFailed: replyResult.toolExecutionFailed,
+    }).catch((err) => {
+      logger.debug({ err, chatId: job.chatId }, "Path policy reflection failed (non-critical)");
+    });
+
+    // 10. Save ALL sent assistant messages to context (parallel)
+    const t7 = performance.now();
+    await Promise.all(
+      sentMessages.map((sent) =>
+        addAssistant(job.chatId, {
+          textContent: sent.text,
+          messageId: sent.messageId,
+        }),
+      ),
+    );
+    timings["saveAssistant"] = Math.round(performance.now() - t7);
+    await releaseHeldChatLock();
+
+    // 11. Record reply outcome for FIRST reply (primary)
+    if (e.OUTCOME_TRACKING_ENABLED && sentMessages.length > 0) {
+      const first = sentMessages[0]!;
+      recordReply(
+        job.chatId,
+        first.messageId,
+        formatted.messageId,
+        formatted.uid,
+        formatted.textContent,
+        first.text,
+        judgeResult.action,
+      ).catch((err) => {
+        logger.debug({ err, chatId: job.chatId }, "Outcome recording failed (non-critical)");
+      });
+    }
+
+    const totalMs = Math.round(performance.now() - start);
+    logger.info(
+      {
+        chatId: job.chatId,
+        messageId: formatted.messageId,
+        action: judgeResult.action,
+        replyPath: effectiveReplyPath,
+        replyTier: effectiveReplyTier,
+        retrievalMode,
+        recentCount: retrievedContext.recent.length,
+        semanticCount: retrievedContext.semantic.length,
+        threadCount: retrievedContext.thread.length,
+        entityCount: retrievedContext.entity.length,
+        retrievalMs: timings["retrieval"] ?? 0,
+        replyMs: timings["reply"] ?? 0,
+        replyCount: sentMessages.length,
+        replyMsgIds: sentMessages.map((s) => s.messageId),
+        totalMs,
+        timings,
+      },
+      "Pipeline complete",
+    );
+  } catch (err) {
+    if (maxPlaceholderMsgId) {
+      await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
+    }
+
+    const totalMs = Math.round(performance.now() - start);
+    logger.error(
+      {
+        chatId: job.chatId,
+        messageId: formatted.messageId,
+        action: judgeResult.action,
+        totalMs,
+        timings,
+        err,
+      },
+      "Pipeline reply/send failed",
+    );
+
+    try {
+      await sender.sendDirect(
+        job.chatId,
+        "喵呜...本喵出了点小故障，稍后再试试吧 >_<",
+      );
+    } catch {
+      logger.warn({ chatId: job.chatId }, "Fallback message also failed");
+    }
+  }
+}
+
+// Pre-mute-gate intercepts: DM-only command guard, consent reply detection.
+// Runs BEFORE the mute gate so consent acks can land even when the user has
+// soft-muted the bot, and DM /checkin gets the right error message.
+async function tryPreMuteIntercepts(
+  chatId: number,
+  formatted: FormattedMessage,
+  judgeResult: JudgeResult,
+): Promise<boolean> {
+  // DM: disable group-only commands (/checkin, /stats)
+  if (chatId > 0 && judgeResult.rule === "whitelisted_command") {
+    const cmd = (formatted.textContent || "")
+      .trim()
+      .split(/[\s@]/)[0]
+      ?.toLowerCase();
+    if (cmd === "/checkin" || cmd === "/stats") {
+      await sender.sendDirect(chatId, "签到和统计功能只在群里有效喵~", formatted.messageId);
+      return true;
+    }
+  }
+
+  // Consent reply detection (group, replying to bot's consent question)
+  if (chatId < 0 && judgeResult.rule === "reply_to_self" && formatted.replyTo) {
+    const consentResult = detectConsentReply(
+      formatted.textContent || "",
+      formatted.replyTo.textSnippet,
+    );
+    if (consentResult) {
+      setConsent(chatId, formatted.uid, consentResult.approved ? "approved" : "denied");
+      const ack = consentResult.approved ? "好的，已记录同意~" : "好的，不会转发消息给你~";
+      await sender.sendDirect(chatId, ack, formatted.messageId);
+      logger.info(
+        { chatId, uid: formatted.uid, approved: consentResult.approved },
+        "Consent reply processed",
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Post-mute-gate intercepts: sticker_dislike, remember/view/forget preferences,
+// and DM relay. Run after the mute gate so a muted user can't trigger them.
+async function tryPostMuteIntercepts(
+  chatId: number,
+  formatted: FormattedMessage,
+  judgeResult: JudgeResult,
+  e: ReturnType<typeof env>,
+): Promise<boolean> {
+  // Sticker dislike interception
+  if (judgeResult.rule === "sticker_dislike" && formatted.replyTo) {
+    const sent = lookupSentSticker(chatId, formatted.replyTo.messageId);
+    if (sent) {
+      recordStickerDislike(sent.fileUniqueId, chatId, formatted.uid);
+      const score = getStickerScore(sent.fileUniqueId);
+      const ack =
+        score <= 0.1
+          ? "好的，这个贴纸不会再出现了喵~"
+          : "知道了，下次少用这个贴纸~";
+      await sender.sendDirect(chatId, ack, formatted.messageId);
+      logger.info(
+        { chatId, fileUniqueId: sent.fileUniqueId, newScore: score, userId: formatted.uid },
+        "Sticker dislike recorded",
+      );
+      return true;
+    }
+    // sent not found → fall through to normal reply flow
+  }
+
+  // Remember request — extract content to save, fall through if empty/error
+  if (judgeResult.rule === "remember_request" && !formatted.isAnonymous) {
+    const text = (formatted.textContent || formatted.captionContent || "").trim();
+    const content = text
+      .replace(
+        /^(?:帮[我俺]?记(?:住|一下|下来?)|记(?:住|下来?)(?:一下)?[：:，,]\s*|keep\s+in\s+mind[：:，,\s]*|记得(?:一下)?[：:，,]\s*)/i,
+        "",
+      )
+      .trim();
+    if (content) {
+      try {
+        saveUserPreference(chatId, formatted.uid, content);
+        logger.info({ chatId, uid: formatted.uid, content }, "User preference saved");
+        await sender.sendDirect(chatId, "记住啦喵~", formatted.messageId);
+        return true;
+      } catch (err) {
+        logger.warn({ err, chatId }, "saveUserPreference failed");
+        // fall through to normal reply on error
+      }
+    }
+  }
+
+  // View preferences request
+  if (judgeResult.rule === "view_prefs_request" && !formatted.isAnonymous) {
+    const prefs = getUserPreferences(chatId, formatted.uid);
+    const profile = getUserProfilePrompt(chatId, formatted.uid);
+    const parts: string[] = [];
+    if (profile) parts.push(`🧠 本喵对你的印象：\n${profile}`);
+    if (prefs) parts.push(`📝 你让本喵记住的：\n${prefs}`);
+    const reply = parts.length > 0 ? parts.join('\n\n') : '本喵还没记住什么呢喵~';
+    await sender.sendDirect(chatId, reply, formatted.messageId);
+    return true;
+  }
+
+  // Forget preference request
+  if (judgeResult.rule === "forget_request" && !formatted.isAnonymous) {
+    const text = (formatted.textContent || "").trim();
+    const keyword = text
+      .replace(
+        /^(?:忘(?:掉|了|记)?[：:，,\s]*|别记了[：:，,\s]*|不用记了[：:，,\s]*|forget\s*)/i,
+        "",
+      )
+      .trim();
+    if (keyword) {
+      const deleted = deleteUserPreference(chatId, formatted.uid, keyword);
+      await sender.sendDirect(
+        chatId,
+        deleted ? `已经忘掉「${deleted}」了喵~` : "没找到相关的记忆喵~",
+        formatted.messageId,
+      );
+      return true;
+    }
+    // No keyword — fall through to normal reply
+  }
+
+  // DM relay intercept (private chat only)
+  if (chatId > 0 && judgeResult.rule === "private_chat") {
+    const text = formatted.textContent || "";
+    const maybeRelay =
+      /群|看看|瞅瞅|瞄|告诉|传话|转告|转达|发给|传给|带话|送给|转发|@/.test(text);
+    if (maybeRelay) {
+      await sendChatAction(chatId, "typing");
+      const intent = await detectDmIntentWithAI(text, e.BOT_USERNAME);
+      if (intent.type !== "normal_chat") {
+        try {
+          await handleDmRelay(chatId, formatted, intent);
+        } catch (err) {
+          logger.error({ err, chatId }, "DM relay failed");
+          await sender.sendDirect(chatId, "处理失败了喵，稍后再试~", formatted.messageId);
+        }
+        return true;
+      }
+    }
+    // normal_chat → fall through to regular reply pipeline
+  }
+
+  return false;
+}
+
 export async function processPipeline(job: ChatJob): Promise<void> {
   const start = performance.now();
   const timings: Record<string, number> = {};
-  let releaseChatLock = await acquireChatLock(job.chatId);
-  let chatLockHeld = true;
+  const lockState: ChatLockState = {
+    release: await acquireChatLock(job.chatId),
+    held: true,
+  };
 
   const releaseHeldChatLock = async (): Promise<void> => {
-    if (!chatLockHeld) return;
-    chatLockHeld = false;
-    await releaseChatLock();
+    if (!lockState.held) return;
+    lockState.held = false;
+    await lockState.release();
   };
 
   try {
@@ -170,7 +789,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       return;
     }
 
-    // 2. Vision / Sticker / Multimodal — run in parallel
+    // 2. Media stage — vision / sticker / multimodal / replyTo attachments
     const hasMedia = !!(
       formatted.imageFileId ||
       formatted.sticker ||
@@ -180,54 +799,10 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       formatted.videoFileId ||
       formatted.videoNoteFileId
     );
+    const tmedia = performance.now();
+    await processMedia(formatted);
     if (hasMedia) {
-      const tmedia = performance.now();
-      await Promise.all([
-        formatted.imageFileId
-          ? describeImage(formatted.imageFileId)
-              .then((d) => { if (d) formatted.imageDescriptions = [d]; })
-              .catch((err) => logger.warn({ err }, "Vision failed, continuing"))
-          : Promise.resolve(),
-        formatted.sticker
-          ? describeStickerCached(formatted.sticker.fileId, formatted.sticker.fileUniqueId)
-              .then((d) => { if (d && d !== "[图片]") (formatted.sticker as { description?: string }).description = d; })
-              .catch((err) => logger.warn({ err }, "Sticker description failed, continuing"))
-          : Promise.resolve(),
-        (formatted.audioFileId || formatted.voiceFileId || formatted.documentFileId || formatted.videoFileId || formatted.videoNoteFileId)
-          ? describeMultimodal(formatted)
-              .then((d) => { if (d) formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + d : d).trim(); })
-              .catch((err) => logger.warn({ err }, "Multimodal processing failed, continuing"))
-          : Promise.resolve(),
-      ]);
       timings["media"] = Math.round(performance.now() - tmedia);
-    }
-
-    // 2.9 ReplyTo attachment — if user replies to a message with a file/image, process it
-    if (formatted.replyTo && !formatted.documentFileId && !formatted.imageFileId) {
-      if (formatted.replyTo.documentFileId) {
-        formatted.documentFileId = formatted.replyTo.documentFileId;
-        formatted.documentMimeType = formatted.replyTo.documentMimeType;
-        formatted.documentFileName = formatted.replyTo.documentFileName;
-        try {
-          const desc = await describeMultimodal(formatted);
-          if (desc) {
-            formatted.textContent = (formatted.textContent ? formatted.textContent + "\n" + desc : desc).trim();
-          }
-        } catch (err) {
-          logger.warn({ err }, "ReplyTo document processing failed, continuing");
-        }
-        // Clear so it doesn't get processed again
-        formatted.documentFileId = undefined;
-      } else if (formatted.replyTo.imageFileId) {
-        try {
-          const description = await describeImage(formatted.replyTo.imageFileId);
-          if (description) {
-            formatted.imageDescriptions = [description];
-          }
-        } catch (err) {
-          logger.warn({ err }, "ReplyTo image processing failed, continuing");
-        }
-      }
     }
 
     // 3. Save to context
@@ -507,181 +1082,14 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       );
     }
 
-    // 5.4 Mute/unmute interception — must be handled before the mute gate (group only)
-    if (
-      judgeResult.rule === "mute_hard_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      muteUser(job.chatId, formatted.uid, 2);
-      await sender.sendDirect(
-        job.chatId,
-        "好的，本喵完全闭嘴喵~",
-        formatted.messageId,
-      );
-      logger.info(
-        { chatId: job.chatId, uid: formatted.uid, level: 2 },
-        "User hard-muted bot",
-      );
+    // 5.4 / 5.41 / 5.41b Mute / unmute / self-mute commands
+    if (await tryMuteCommandIntercepts(job.chatId, formatted, judgeResult)) {
       return;
     }
 
-    if (
-      judgeResult.rule === "mute_soft_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      muteUser(job.chatId, formatted.uid, 1, { temporary: true });
-      await sender.sendDirect(
-        job.chatId,
-        "好的，本喵不会主动找你说话了喵~",
-        formatted.messageId,
-      );
-      logger.info(
-        { chatId: job.chatId, uid: formatted.uid, level: 1 },
-        "User soft-muted bot",
-      );
+    // 5.42 Pre-mute-gate intercepts (DM command guard, consent reply)
+    if (await tryPreMuteIntercepts(job.chatId, formatted, judgeResult)) {
       return;
-    }
-
-    if (
-      judgeResult.rule === "mute_timed_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      const text = formatted.textContent || formatted.captionContent || "";
-      const durationMs = parseMuteTimedRequest(text);
-      if (durationMs && durationMs > 0) {
-        muteUser(job.chatId, formatted.uid, 1, { temporary: true, durationMs });
-        const minutes = Math.round(durationMs / 60_000);
-        await sender.sendDirect(
-          job.chatId,
-          `好的，本喵安静 ${minutes} 分钟喵~`,
-          formatted.messageId,
-        );
-        logger.info(
-          { chatId: job.chatId, uid: formatted.uid, durationMs },
-          "User timed-muted bot",
-        );
-        return;
-      }
-    }
-
-    if (
-      judgeResult.rule === "unmute_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      unmuteUser(job.chatId, formatted.uid);
-      await sender.sendDirect(
-        job.chatId,
-        "嗯！本喵又可以说话啦喵~",
-        formatted.messageId,
-      );
-      logger.info(
-        { chatId: job.chatId, uid: formatted.uid },
-        "User unmuted bot",
-      );
-      return;
-    }
-
-    // 5.41 Self-mute commands (/muteme / /unmuteme) — group only
-    if (
-      judgeResult.rule === "self_mute_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      muteUser(job.chatId, formatted.uid, 2);
-      await sender.sendDirect(
-        job.chatId,
-        "好的，以后本喵不回复你的消息了喵~（发 /unmuteme 取消）",
-        formatted.messageId,
-      );
-      logger.info(
-        { chatId: job.chatId, uid: formatted.uid },
-        "User self-muted (level 2)",
-      );
-      return;
-    }
-
-    if (
-      judgeResult.rule === "self_unmute_request" &&
-      !formatted.isAnonymous &&
-      job.chatId < 0
-    ) {
-      unmuteUser(job.chatId, formatted.uid);
-      await sender.sendDirect(
-        job.chatId,
-        "好的，本喵又会回复你的消息了喵~",
-        formatted.messageId,
-      );
-      logger.info(
-        { chatId: job.chatId, uid: formatted.uid },
-        "User self-unmuted",
-      );
-      return;
-    }
-
-    // 5.41b Anonymous identity (channel) can't use mute commands
-    if (
-      (judgeResult.rule === "self_mute_request" ||
-        judgeResult.rule === "self_unmute_request") &&
-      formatted.isAnonymous
-    ) {
-      await sender.sendDirect(
-        job.chatId,
-        "频道身份没法用这个命令喵，用个人身份试试~",
-        formatted.messageId,
-      );
-      return;
-    }
-
-    // 5.42a DM: disable group-only commands (/checkin, /stats)
-    if (job.chatId > 0 && judgeResult.rule === "whitelisted_command") {
-      const cmd = (formatted.textContent || "")
-        .trim()
-        .split(/[\s@]/)[0]
-        ?.toLowerCase();
-      if (cmd === "/checkin" || cmd === "/stats") {
-        await sender.sendDirect(
-          job.chatId,
-          "签到和统计功能只在群里有效喵~",
-          formatted.messageId,
-        );
-        return;
-      }
-    }
-
-    // 5.42b Consent reply detection (group messages replying to bot's consent question)
-    if (
-      job.chatId < 0 &&
-      judgeResult.rule === "reply_to_self" &&
-      formatted.replyTo
-    ) {
-      const consentResult = detectConsentReply(
-        formatted.textContent || "",
-        formatted.replyTo.textSnippet,
-      );
-      if (consentResult) {
-        setConsent(
-          job.chatId,
-          formatted.uid,
-          consentResult.approved ? "approved" : "denied",
-        );
-        const ack = consentResult.approved
-          ? "好的，已记录同意~"
-          : "好的，不会转发消息给你~";
-        await sender.sendDirect(job.chatId, ack, formatted.messageId);
-        logger.info(
-          {
-            chatId: job.chatId,
-            uid: formatted.uid,
-            approved: consentResult.approved,
-          },
-          "Consent reply processed",
-        );
-        return;
-      }
     }
 
     // 5.45 Mute gate
@@ -710,451 +1118,34 @@ export async function processPipeline(job: ChatJob): Promise<void> {
       }
     }
 
-    // 5.5 Sticker dislike interception
-    if (judgeResult.rule === "sticker_dislike" && formatted.replyTo) {
-      const sent = lookupSentSticker(job.chatId, formatted.replyTo.messageId);
-      if (sent) {
-        recordStickerDislike(sent.fileUniqueId, job.chatId, formatted.uid);
-        const score = getStickerScore(sent.fileUniqueId);
-        const ack =
-          score <= 0.1
-            ? "好的，这个贴纸不会再出现了喵~"
-            : "知道了，下次少用这个贴纸~";
-        await sender.sendDirect(job.chatId, ack, formatted.messageId);
-        logger.info(
-          {
-            chatId: job.chatId,
-            fileUniqueId: sent.fileUniqueId,
-            newScore: score,
-            userId: formatted.uid,
-          },
-          "Sticker dislike recorded",
-        );
-        return;
-      }
-      // sent not found → fall through to normal reply flow
-    }
-
-    // 5.6 Remember request interception
-    if (judgeResult.rule === "remember_request" && !formatted.isAnonymous) {
-      const text = (
-        formatted.textContent ||
-        formatted.captionContent ||
-        ""
-      ).trim();
-      // Strip the trigger phrase to extract what should be remembered
-      const content = text
-        .replace(
-          /^(?:帮[我俺]?记(?:住|一下|下来?)|记(?:住|下来?)(?:一下)?[：:，,]\s*|keep\s+in\s+mind[：:，,\s]*|记得(?:一下)?[：:，,]\s*)/i,
-          "",
-        )
-        .trim();
-      if (!content) {
-        // Trigger phrase only, nothing to save — fall through to normal reply
-      } else {
-        try {
-          saveUserPreference(job.chatId, formatted.uid, content);
-          logger.info(
-            { chatId: job.chatId, uid: formatted.uid, content },
-            "User preference saved",
-          );
-          await sender.sendDirect(job.chatId, "记住啦喵~", formatted.messageId);
-          return;
-        } catch (err) {
-          logger.warn({ err, chatId: job.chatId }, "saveUserPreference failed");
-          // fall through to normal reply on error
-        }
-      }
-    }
-
-    // 5.61 View preferences request
-    if (judgeResult.rule === "view_prefs_request" && !formatted.isAnonymous) {
-      const prefs = getUserPreferences(job.chatId, formatted.uid);
-      const profile = getUserProfilePrompt(job.chatId, formatted.uid);
-      const parts: string[] = [];
-      if (profile) parts.push(`🧠 本喵对你的印象：\n${profile}`);
-      if (prefs) parts.push(`📝 你让本喵记住的：\n${prefs}`);
-      const reply = parts.length > 0 ? parts.join('\n\n') : '本喵还没记住什么呢喵~';
-      await sender.sendDirect(job.chatId, reply, formatted.messageId);
+    // 5.5 / 5.6 / 5.61 / 5.62 / 5.7 Post-mute-gate intercepts
+    if (await tryPostMuteIntercepts(job.chatId, formatted, judgeResult, e)) {
       return;
-    }
-
-    // 5.62 Forget preference request
-    if (judgeResult.rule === "forget_request" && !formatted.isAnonymous) {
-      const text = (formatted.textContent || "").trim();
-      const keyword = text
-        .replace(
-          /^(?:忘(?:掉|了|记)?[：:，,\s]*|别记了[：:，,\s]*|不用记了[：:，,\s]*|forget\s*)/i,
-          "",
-        )
-        .trim();
-      if (keyword) {
-        const deleted = deleteUserPreference(
-          job.chatId,
-          formatted.uid,
-          keyword,
-        );
-        if (deleted) {
-          await sender.sendDirect(
-            job.chatId,
-            `已经忘掉「${deleted}」了喵~`,
-            formatted.messageId,
-          );
-        } else {
-          await sender.sendDirect(
-            job.chatId,
-            "没找到相关的记忆喵~",
-            formatted.messageId,
-          );
-        }
-        return;
-      }
-      // No keyword — fall through to normal reply
-    }
-
-    // 5.7 DM relay intercept (private chat only)
-    if (job.chatId > 0 && judgeResult.rule === "private_chat") {
-      const text = formatted.textContent || "";
-      // Only call AI intent detection when message contains relay-related keywords
-      const maybeRelay =
-        /群|看看|瞅瞅|瞄|告诉|传话|转告|转达|发给|传给|带话|送给|转发|@/.test(
-          text,
-        );
-      if (maybeRelay) {
-        await sendChatAction(job.chatId, "typing");
-        const intent = await detectDmIntentWithAI(text, e.BOT_USERNAME);
-        if (intent.type !== "normal_chat") {
-          try {
-            await handleDmRelay(job.chatId, formatted, intent);
-          } catch (err) {
-            logger.error({ err, chatId: job.chatId }, "DM relay failed");
-            await sender.sendDirect(
-              job.chatId,
-              "处理失败了喵，稍后再试~",
-              formatted.messageId,
-            );
-          }
-          return;
-        }
-      }
-      // normal_chat → fall through to regular reply pipeline
     }
 
     await releaseHeldChatLock();
 
-    // 6-10: Reply generation and send (with error recovery)
-    let maxPlaceholderMsgId: number | undefined;
-    try {
-      // 6. reply_max: quota check + thinking placeholder
-      if (effectiveReplyTier === "max") {
-        const remaining = getRemainingMaxQuota(formatted.uid);
-        if (remaining <= 0) {
-          await sender.sendDirect(
-            job.chatId,
-            "今天的深度思考次数已用完喵（每人每天3次）~",
-            formatted.messageId,
-          );
-          logger.info(
-            { chatId: job.chatId, uid: formatted.uid },
-            "reply_max quota exhausted",
-          );
-          return;
-        }
-        // Send placeholder before slow AI call
-        maxPlaceholderMsgId = await sendMessage(job.chatId, "💭 思考中…");
-      }
-
-      // 6b. Send typing indicator
-      await sendChatAction(job.chatId, "typing");
-
-      // 7. 4-way context retrieval
-      const t4 = performance.now();
-      const retrievalMode =
-        effectiveReplyPath === "planned" ? "planned" : "direct";
-      const retrievedContext = await retrieveContext(
-        job.chatId,
-        formatted,
-        botUid,
-        { mode: retrievalMode },
+    // 6-11: Reply generation, send, and post-send bookkeeping
+    if (!effectiveReplyPath || !effectiveReplyTier) {
+      logger.warn(
+        { chatId: job.chatId, judgeAction: judgeResult.action },
+        "Reached reply stage without effective path/tier — skipping",
       );
-      timings["retrieval"] = Math.round(performance.now() - t4);
-
-      // 8. Generate reply (returns array for multi-reply support)
-      const t5 = performance.now();
-      const replyResult = await generateReply(
-        formatted,
-        retrievedContext,
-        judgeResult.action,
-        job.chatId,
-        botUid,
-        effectiveReplyPath,
-        effectiveReplyTier,
-      );
-      const replies = replyResult.replies;
-      timings["reply"] = Math.round(performance.now() - t5);
-
-      releaseChatLock = await acquireChatLock(job.chatId);
-      chatLockHeld = true;
-
-      if (
-        await shouldSuppressStaleReply(
-          job.chatId,
-          formatted,
-          judgeResult.rule,
-          botUid,
-          e.JUDGE_WINDOW_SIZE,
-        )
-      ) {
-        if (maxPlaceholderMsgId) {
-          await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
-        }
-        logger.info(
-          {
-            chatId: job.chatId,
-            messageId: formatted.messageId,
-            rule: judgeResult.rule,
-          },
-          "Concurrent reply suppressed after newer assistant turn",
-        );
-        return;
-      }
-
-      // 9. Send all replies to Telegram
-      const t6 = performance.now();
-      const sentMessages: Array<{ messageId: number; text: string }> = [];
-
-      // Load sticker policy once
-      const override = await loadOverrideCached(getRedis()).catch(() => null);
-      const stickerPolicy = {
-        enabled: override?.sticker_policy?.enabled ?? true,
-        mode: override?.sticker_policy?.mode ?? "ai",
-        sendPosition: override?.sticker_policy?.send_position ?? "after",
-      };
-      // reply_quote: true = attach reply_to (default), false = send without quoting
-      const replyQuoteEnabled = override?.reply_quote !== false;
-
-      // Check if all replies target the same message (single-target split)
-      const allSameTarget =
-        replies.length > 1 &&
-        replies.every((r) => r.targetMessageId === replies[0]!.targetMessageId);
-
-      // Send all replies in parallel, then collect results in order
-      const sendResults = await Promise.allSettled(
-        replies.map(async (reply, replyIdx) => {
-          // Resolve sticker before sending if position is 'before'
-          let stickerFileId: string | undefined;
-          let stickerFileUniqueId: string | undefined;
-          let stickerIntent: string | undefined;
-          if (
-            stickerPolicy.enabled &&
-            stickerPolicy.mode !== "off" &&
-            reply.stickerIntent &&
-            reply.stickerIntent.length > 0 &&
-            _repliesSinceLastSticker >= STICKER_COOLDOWN_REPLIES
-          ) {
-            const candidates = getReadyStickersByIntent(reply.stickerIntent);
-            if (candidates.length > 0) {
-              candidates.sort((a, b) => b.score - a.score);
-              // Exclude recently sent stickers, pick from top 10
-              const fresh = candidates.filter((c) => !_recentStickerIds.has(c.fileUniqueId));
-              const pool = (fresh.length > 0 ? fresh : candidates).slice(0, 10);
-              const picked = pool[Math.floor(Math.random() * pool.length)]!;
-              _trackRecentSticker(picked.fileUniqueId);
-              stickerFileId = picked.fileId;
-              stickerFileUniqueId = picked.fileUniqueId;
-              stickerIntent = reply.stickerIntent[0];
-            }
-          }
-
-          if (stickerFileId && stickerPolicy.sendPosition === "before") {
-            const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
-              logger.warn({ err, chatId: job.chatId }, "Sticker send (before) failed, continuing");
-              return undefined;
-            });
-            if (stickerMsgId && stickerFileUniqueId) {
-              recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
-            }
-          }
-
-          const replyToId =
-            !replyQuoteEnabled ||
-            reply.replyQuote === false ||
-            (allSameTarget && replyIdx > 0)
-              ? undefined
-              : reply.targetMessageId;
-
-          // Sticker-only reply: skip text, just send sticker
-          const isStickerOnly = reply.replyContent.trim() === '[sticker]' && stickerFileId;
-
-          if (!isStickerOnly) {
-            const sent = await sender.sendDirect(job.chatId, reply.replyContent, replyToId);
-
-            if (stickerFileId && stickerPolicy.sendPosition === "after") {
-              const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
-                logger.warn({ err, chatId: job.chatId }, "Sticker send (after) failed, continuing");
-                return undefined;
-              });
-              if (stickerMsgId && stickerFileUniqueId) {
-                recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
-              }
-            }
-
-            return { messageId: sent.messageId, text: reply.replyContent };
-          }
-
-          // Sticker-only: just send sticker
-          if (stickerFileId) {
-            const stickerMsgId = await sendSticker(job.chatId, stickerFileId).catch((err) => {
-              logger.warn({ err, chatId: job.chatId }, "Sticker-only send failed");
-              return undefined;
-            });
-            if (stickerMsgId && stickerFileUniqueId) {
-              recordStickerSent(job.chatId, stickerMsgId, stickerFileUniqueId, stickerFileId, stickerIntent);
-            }
-            return { messageId: stickerMsgId ?? 0, text: '[sticker]' };
-          }
-          return { messageId: 0, text: '' };
-        }),
-      );
-
-      // Collect results in original order
-      for (let replyIdx = 0; replyIdx < sendResults.length; replyIdx++) {
-        const result = sendResults[replyIdx]!;
-        if (result.status === "fulfilled") {
-          sentMessages.push(result.value);
-          _repliesSinceLastSticker++;
-        } else {
-          logger.error(
-            { chatId: job.chatId, targetMessageId: replies[replyIdx]!.targetMessageId, err: result.reason },
-            "Failed to send reply in multi-reply sequence",
-          );
-        }
-      }
-      timings["send"] = Math.round(performance.now() - t6);
-
-      if (sentMessages.length === 0) {
-        throw new Error("All replies failed to send");
-      }
-
-      // Edit reply_max thinking placeholder to show first reply (avoids delete+send flicker)
-      if (maxPlaceholderMsgId && sentMessages.length > 0) {
-        const first = sentMessages[0]!;
-        await editMessage(job.chatId, maxPlaceholderMsgId, first.text).catch((err) => {
-          logger.warn({ err, chatId: job.chatId }, "Failed to edit placeholder, leaving as-is");
-        });
-        // Replace the first sentMessage entry with the placeholder's messageId
-        sentMessages[0] = { messageId: maxPlaceholderMsgId, text: first.text };
-      } else if (maxPlaceholderMsgId) {
-        await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
-      }
-
-      // Consume max quota only after successful reply
-      if (effectiveReplyTier === "max") {
-        consumeMaxQuota(formatted.uid);
-        logger.info(
-          { chatId: job.chatId, uid: formatted.uid },
-          "reply_max quota consumed after success",
-        );
-      }
-
-      await reflectChatPathPolicy({
-        chatId: job.chatId,
-        message: formatted,
-        botUid,
-        effectiveReplyPath,
-        replyText: sentMessages[0]?.text ?? "",
-        toolsUsed: replyResult.toolsUsed,
-        toolExecutionFailed: replyResult.toolExecutionFailed,
-      }).catch((err) => {
-        logger.debug(
-          { err, chatId: job.chatId },
-          "Path policy reflection failed (non-critical)",
-        );
-      });
-
-      // 10. Save ALL sent assistant messages to context (parallel)
-      const t7 = performance.now();
-      await Promise.all(
-        sentMessages.map((sent) =>
-          addAssistant(job.chatId, {
-            textContent: sent.text,
-            messageId: sent.messageId,
-          }),
-        ),
-      );
-      timings["saveAssistant"] = Math.round(performance.now() - t7);
-      await releaseHeldChatLock();
-
-      // 11. Record reply outcome for FIRST reply (primary)
-      if (e.OUTCOME_TRACKING_ENABLED && sentMessages.length > 0) {
-        const first = sentMessages[0]!;
-        recordReply(
-          job.chatId,
-          first.messageId,
-          formatted.messageId,
-          formatted.uid,
-          formatted.textContent,
-          first.text,
-          judgeResult.action,
-        ).catch((err) => {
-          logger.debug(
-            { err, chatId: job.chatId },
-            "Outcome recording failed (non-critical)",
-          );
-        });
-      }
-
-      const totalMs = Math.round(performance.now() - start);
-      logger.info(
-        {
-          chatId: job.chatId,
-          messageId: formatted.messageId,
-          action: judgeResult.action,
-          replyPath: effectiveReplyPath,
-          replyTier: effectiveReplyTier,
-          retrievalMode,
-          recentCount: retrievedContext.recent.length,
-          semanticCount: retrievedContext.semantic.length,
-          threadCount: retrievedContext.thread.length,
-          entityCount: retrievedContext.entity.length,
-          retrievalMs: timings["retrieval"] ?? 0,
-          replyMs: timings["reply"] ?? 0,
-          replyCount: sentMessages.length,
-          replyMsgIds: sentMessages.map((s) => s.messageId),
-          totalMs,
-          timings,
-        },
-        "Pipeline complete",
-      );
-    } catch (err) {
-      // Clean up reply_max placeholder on failure
-      if (maxPlaceholderMsgId) {
-        await deleteMessage(job.chatId, maxPlaceholderMsgId).catch(() => {});
-      }
-
-      const totalMs = Math.round(performance.now() - start);
-      logger.error(
-        {
-          chatId: job.chatId,
-          messageId: formatted.messageId,
-          action: judgeResult.action,
-          totalMs,
-          timings,
-          err,
-        },
-        "Pipeline reply/send failed",
-      );
-
-      // Attempt fallback error message (best-effort)
-      try {
-        await sender.sendDirect(
-          job.chatId,
-          "喵呜...本喵出了点小故障，稍后再试试吧 >_<",
-        );
-      } catch {
-        logger.warn({ chatId: job.chatId }, "Fallback message also failed");
-      }
+      return;
     }
+    await generateAndSendReplies({
+      job,
+      formatted,
+      judgeResult,
+      botUid,
+      effectiveReplyPath,
+      effectiveReplyTier,
+      e,
+      start,
+      timings,
+      lockState,
+      releaseHeldChatLock,
+    });
   } finally {
     await releaseHeldChatLock();
   }

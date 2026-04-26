@@ -56,7 +56,7 @@ export async function runAiReview(
       systemPrompt: string,
       userMessage: string,
     ) => Promise<string | null>;
-    getChat?: (chatId: number) => Promise<Record<string, unknown> | null>;
+    getChat?: (chatId: number) => Promise<unknown>;
     getRecentContext?: (
       chatId: number,
       limit: number,
@@ -75,8 +75,8 @@ export async function runAiReview(
 
   const request = JSON.parse(raw) as PendingRequest;
 
-  // Gather context
-  let chatInfo: Record<string, unknown> | null = null;
+  // Gather context (chatInfo is whatever Telegram returns; just JSON-stringified below)
+  let chatInfo: unknown = null;
   if (deps.getChat) {
     try {
       chatInfo = await deps.getChat(request.chat_id);

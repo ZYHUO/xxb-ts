@@ -31,6 +31,9 @@ const httpExecuteSchema = z.object({
   headers: z.record(z.string()).optional(),
   body: z.record(z.unknown()).optional(),
   resultPath: z.string().optional(),
+  // When trusted=true, every resolved URL must point to one of these hosts
+  // (lowercase). Required when trusted is true. Wildcard via "*.example.com".
+  allowedHosts: z.array(z.string().min(1)).optional(),
 });
 
 const scriptExecuteSchema = z.object({
@@ -57,6 +60,20 @@ function applyTemplate(template: string, params: Record<string, unknown>): strin
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) =>
     params[key] !== undefined ? String(params[key]) : `{{${key}}}`,
   );
+}
+
+function isHostAllowed(hostname: string, allowedHosts: readonly string[]): boolean {
+  const host = hostname.toLowerCase();
+  for (const entry of allowedHosts) {
+    const allowed = entry.toLowerCase();
+    if (allowed.startsWith('*.')) {
+      const suffix = allowed.slice(1); // ".example.com"
+      if (host === suffix.slice(1) || host.endsWith(suffix)) return true;
+    } else if (host === allowed) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function getNestedValue(obj: unknown, path: string): unknown {
@@ -88,7 +105,26 @@ async function executeHttp(
   trusted = false,
 ): Promise<unknown> {
   const url = applyTemplate(exec.url, params);
-  if (!trusted) assertUrlSsrfSafe(url);
+  if (trusted) {
+    // Trusted skills bypass SSRF but must declare allowedHosts.
+    // The post-template hostname must match — defends against template injection
+    // routing the request to an attacker-controlled host (e.g. {{city}} = "evil.com/x?#").
+    const allowedHosts = exec.allowedHosts ?? [];
+    if (allowedHosts.length === 0) {
+      throw new Error('trusted skill missing allowedHosts');
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid URL after template expansion');
+    }
+    if (!isHostAllowed(parsed.hostname, allowedHosts)) {
+      throw new Error(`Host ${parsed.hostname} not in allowedHosts`);
+    }
+  } else {
+    assertUrlSsrfSafe(url);
+  }
 
   const headers: Record<string, string> = exec.headers
     ? Object.fromEntries(Object.entries(exec.headers).map(([k, v]) => [k, applyTemplate(v, params)]))
@@ -207,6 +243,17 @@ export async function loadSkills(skillsDir: string): Promise<Record<string, Load
       }
       if (BUILTIN_TOOLS.has(skill.name)) {
         logger.warn({ name: skill.name }, 'Skill name conflicts with a built-in tool, skipping');
+        continue;
+      }
+      if (
+        skill.trusted &&
+        skill.execute.type === 'http' &&
+        (!skill.execute.allowedHosts || skill.execute.allowedHosts.length === 0)
+      ) {
+        logger.warn(
+          { name: skill.name },
+          'Trusted skill must declare a non-empty allowedHosts list, skipping',
+        );
         continue;
       }
       tools[skill.name] = skillEntry(skill);
