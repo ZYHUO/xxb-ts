@@ -551,7 +551,9 @@ async function generateAndSendReplies(args: {
     }
 
     const totalMs = Math.round(performance.now() - start);
-    logger.info(
+    // Demoted to debug: per-reply timing dump is heavy. Failures and notable
+    // events (quota, suppression, mute) still log at info.
+    logger.debug(
       {
         chatId: job.chatId,
         messageId: formatted.messageId,
@@ -781,7 +783,7 @@ export async function processPipeline(job: ChatJob): Promise<void> {
         memorizeMessage(job.chatId, formatted).catch((err) => {
           logger.debug({ err, chatId: job.chatId }, "Channel source memory write failed");
         });
-        logger.info(
+        logger.debug(
           { chatId: job.chatId, messageId: formatted.messageId, len: text.length },
           "Channel source ingested",
         );
@@ -1035,7 +1037,10 @@ export async function processPipeline(job: ChatJob): Promise<void> {
           };
     const effectiveReplyPath = pathPolicyDecision.replyPath;
 
-    logger.info(
+    // Demoted to debug: this fires for every formattable message and is the
+    // single largest source of pipeline log volume. Action errors / quota
+    // hits / mute changes elsewhere still log at info.
+    logger.debug(
       {
         chatId: job.chatId,
         messageId: formatted.messageId,

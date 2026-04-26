@@ -334,7 +334,7 @@ describe("processPipeline path branching", () => {
       "direct",
       "normal",
     );
-    expect(mockLogger.info).toHaveBeenCalledWith(
+    expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "REPLY",
         replyPath: "direct",
@@ -439,7 +439,7 @@ describe("processPipeline path branching", () => {
       "planned",
       "pro",
     );
-    expect(mockLogger.info).toHaveBeenCalledWith(
+    expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "REPLY",
         replyPath: "planned",
@@ -528,7 +528,7 @@ describe("processPipeline path branching", () => {
     await processPipeline(makeJob());
 
     expect(sendDirect).toHaveBeenCalledTimes(2);
-    expect(mockLogger.info).toHaveBeenCalledWith(
+    expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
         replyCount: 2,
         replyMsgIds: [1001, 1002],

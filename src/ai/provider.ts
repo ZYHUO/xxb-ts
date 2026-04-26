@@ -18,7 +18,12 @@ interface ClaudeMessage {
 interface ClaudeResponse {
   content: Array<{ type: string; text: string }>;
   model: string;
-  usage: { input_tokens: number; output_tokens: number };
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
   error?: { type: string; message: string };
 }
 
@@ -31,7 +36,6 @@ async function callClaude(
   const apiKey = label.apiKeys[0];
   if (!apiKey) throw new AIError('No API key configured', label.name, label.model, 'AI_NO_KEY');
 
-  // Extract system prompt — wrap in array with cache_control to enable prompt caching
   const systemMsg = messages.find(m => m.role === 'system');
   const chatMessages: ClaudeMessage[] = messages
     .filter(m => m.role !== 'system')
@@ -43,8 +47,19 @@ async function callClaude(
     max_tokens: opts.maxTokens ?? 4096,
   };
 
+  // Wrap system prompt as a content block with cache_control. The 5-layer
+  // system prompt (persona + guardrails + schema + tone + task) is reused
+  // across nearly every request, so ephemeral caching cuts that token
+  // weight to ~10% of the regular cost on cache hits. Below the 1024-token
+  // minimum Anthropic just returns no cached_input_tokens; no error.
   if (systemMsg) {
-    body['system'] = systemMsg.content;
+    body['system'] = [
+      {
+        type: 'text',
+        text: systemMsg.content,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
   }
 
   if (opts.temperature !== undefined) body['temperature'] = opts.temperature;
@@ -81,14 +96,22 @@ async function callClaude(
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .trim();
 
-  const usage = data.usage as Record<string, number>;
+  const usage = data.usage;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  if (cacheRead > 0 || cacheWrite > 0) {
+    logger.debug(
+      { label: label.name, cacheRead, cacheWrite, fresh: usage.input_tokens },
+      'Anthropic prompt cache stats',
+    );
+  }
 
   return {
     content: text,
     tokenUsage: {
-      prompt: usage['input_tokens'] ?? 0,
-      completion: usage['output_tokens'] ?? 0,
-      total: (usage['input_tokens'] ?? 0) + (usage['output_tokens'] ?? 0),
+      prompt: usage.input_tokens + cacheRead + cacheWrite,
+      completion: usage.output_tokens,
+      total: usage.input_tokens + cacheRead + cacheWrite + usage.output_tokens,
     },
     model: label.model,
     label: label.name,

@@ -35,7 +35,9 @@ async function handleUpdate(ctx: Context): Promise<void> {
     ? (senderChatTitle ?? senderChatUsername ?? 'channel')
     : (msg.from.username ?? msg.from.first_name ?? 'unknown');
 
-  logger.info(
+  // Demoted to debug: fires for every inbound update (including ones we'll
+  // ignore). The pipeline emits its own info-level lines for actionable events.
+  logger.debug(
     {
       chatId,
       messageId,

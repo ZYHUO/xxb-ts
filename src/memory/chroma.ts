@@ -7,6 +7,7 @@
 // ────────────────────────────────────────
 
 import { ChromaClient, type Collection } from 'chromadb';
+import { LRUCache } from 'lru-cache';
 import type { FormattedMessage } from '../shared/types.js';
 import { logger } from '../shared/logger.js';
 
@@ -20,6 +21,17 @@ let _collection: Collection | undefined;
 let _embedder: ((texts: string[]) => Promise<number[][]>) | undefined;
 // Promise singleton: concurrent callers await the same load; errors clear it so next call retries
 let _embedderPromise: Promise<(texts: string[]) => Promise<number[][]>> | undefined;
+
+// Embedding cache. The same text often gets embedded twice within a single
+// pipeline run — once for memorizeMessage (fire-and-forget write), once when
+// searchMemory uses similar query text. Local CPU embedding is ~10-50ms per
+// call, so caching cuts that. TTL keeps memory bounded; LRU drops cold keys.
+const EMBED_CACHE_MAX = 200;
+const EMBED_CACHE_TTL_MS = 5 * 60 * 1000;
+const _embedCache = new LRUCache<string, number[]>({
+  max: EMBED_CACHE_MAX,
+  ttl: EMBED_CACHE_TTL_MS,
+});
 
 // ── Embedder (local, lazy-loaded) ────────────────────────
 
@@ -37,8 +49,16 @@ function getEmbedder(): Promise<(texts: string[]) => Promise<number[][]>> {
     _embedder = async (texts: string[]): Promise<number[][]> => {
       const results: number[][] = [];
       for (const text of texts) {
-        const out = await extractor(text.slice(0, 512), { pooling: 'mean', normalize: true });
-        results.push(Array.from(out.data as Float32Array));
+        const key = text.slice(0, 512);
+        const cached = _embedCache.get(key);
+        if (cached) {
+          results.push(cached);
+          continue;
+        }
+        const out = await extractor(key, { pooling: 'mean', normalize: true });
+        const vector = Array.from(out.data as Float32Array);
+        _embedCache.set(key, vector);
+        results.push(vector);
       }
       return results;
     };
